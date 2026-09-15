@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "推妖镜 BotZapper",
+  "version": "0.1.0",
+  "description": "照妖镜一照，妖怪现形：识别 X/Twitter 评论区垃圾账号，高亮标注并一键原生拉黑。全程本地运行，不收集任何数据。",
+  "permissions": ["storage", "alarms"],
+  "host_permissions": ["https://x.com/*", "https://twitter.com/*"],
+  "background": {
+    "service_worker": "src/background/service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://x.com/*", "https://twitter.com/*"],
+      "js": [
+        "src/core/normalize.js",
+        "src/core/rules.js",
+        "src/core/auth.js",
+        "src/core/detector.js",
+        "src/core/storage.js",
+        "src/content/ui.js",
+        "src/content/main.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_title": "推妖镜 BotZapper",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

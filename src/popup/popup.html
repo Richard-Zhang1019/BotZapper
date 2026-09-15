@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+  <title>推妖镜 BotZapper</title>
+</head>
+<body>
+  <header class="head">
+    <span class="logo">🪞</span>
+    <div>
+      <h1>推妖镜 <small>BotZapper</small></h1>
+      <p class="tagline">照妖镜一照，妖怪现形</p>
+    </div>
+    <label class="switch" title="总开关">
+      <input type="checkbox" id="enabled">
+      <span class="slider"></span>
+    </label>
+  </header>
+
+  <section class="card">
+    <div class="row">
+      <span class="label">灵敏度</span>
+      <div class="seg" id="sensitivity">
+        <button data-value="loose">宽松</button>
+        <button data-value="standard">标准</button>
+        <button data-value="strict">严格</button>
+      </div>
+    </div>
+    <p class="hint" id="sensitivityHint"></p>
+  </section>
+
+  <section class="card">
+    <div class="row between">
+      <span class="label">今日已拉黑</span>
+      <span class="value" id="dailyText">0 / 50</span>
+    </div>
+    <div class="bar"><div class="bar-fill" id="dailyBar"></div></div>
+    <div class="row between small">
+      <span>累计收妖 <b id="totalText">0</b></span>
+      <span id="queueText"></span>
+    </div>
+    <p class="warn hidden" id="pauseNote"></p>
+    <button class="ghost hidden" id="resumeBtn">恢复队列</button>
+  </section>
+
+  <section class="card">
+    <div class="row between">
+      <span class="label">白名单</span>
+      <span class="small" id="wlCount">0 个账号</span>
+    </div>
+    <ul class="wl" id="wlList"></ul>
+    <p class="hint" id="wlEmpty">误判过的账号会永久豁免，在评论的「误判」按钮中添加。</p>
+  </section>
+
+  <footer class="foot">
+    <span>规则库 v<span id="rulesVersion"></span> · 全程本地运行 · 不收集任何数据</span>
+  </footer>
+
+  <script src="../core/normalize.js"></script>
+  <script src="../core/rules.js"></script>
+  <script src="../core/storage.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

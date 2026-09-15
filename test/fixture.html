@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>BotZapper fixture · 模拟 X 时间线</title>
+<style>
+  body { background: #000; color: #e7e9ea; font-family: system-ui, -apple-system, "PingFang SC", sans-serif; margin: 0; }
+  .timeline { max-width: 600px; margin: 0 auto; border-left: 1px solid #2f3336; border-right: 1px solid #2f3336; min-height: 100vh; padding-bottom: 140px; }
+  .pagehead { padding: 12px 16px; font-weight: 800; font-size: 18px; border-bottom: 1px solid #2f3336; position: sticky; top: 0; background: rgba(0,0,0,.85); }
+  article[data-testid="tweet"] { padding: 12px 16px; border-bottom: 1px solid #2f3336; cursor: default; }
+  article[data-testid="tweet"]:hover { background: #080808; }
+  .u { display: flex; gap: 6px; align-items: center; font-size: 15px; margin-bottom: 4px; }
+  .u a { color: #e7e9ea; font-weight: 700; text-decoration: none; }
+  .u .handle, .u .time { color: #71767b; font-weight: 400; font-size: 15px; }
+  [data-testid="tweetText"] { font-size: 15px; line-height: 1.5; white-space: pre-wrap; }
+  .side { position: fixed; right: 24px; top: 16px; color: #71767b; font-size: 12px; max-width: 220px; }
+</style>
+</head>
+<body>
+<div class="timeline">
+  <div class="pagehead">帖子回复 · fixture</div>
+  <div id="feed"></div>
+</div>
+<div class="side">
+  fixture 说明：本页用假 DOM 模拟 X 结构，加载真实的识别引擎与 UI 代码。<br><br>
+  预期：1/2/3/5 号黄色高亮；4/6/7 号正常显示。
+</div>
+
+<script>
+/* ---------- chrome mock（必须在业务脚本之前） ---------- */
+(function () {
+  var store = {
+    settings: { enabled: true, sensitivity: 'standard', dailyLimit: 50, minDelayMs: 800, maxDelayMs: 2000, showBadge: true },
+    marks: {},
+    whitelist: {},
+    stats: { totalBlocked: 0, dailyDate: '', dailyBlocked: 0 },
+    queueState: { paused: false, reason: null, pausedUntil: 0, lastError: null },
+    queue: []
+  };
+  var listeners = [];
+  function fire(keys) {
+    var changes = {};
+    keys.forEach(function (k) { changes[k] = { newValue: store[k] }; });
+    listeners.forEach(function (fn) { fn(changes, 'local'); });
+  }
+  window.chrome = {
+    runtime: {
+      lastError: undefined,
+      sendMessage: function (msg, cb) {
+        if (msg && msg.type === 'ENQUEUE_BLOCKS') {
+          var n = (msg.users || []).length;
+          setTimeout(function () {
+            (msg.users || []).forEach(function (u) {
+              store.marks[u.screenName.toLowerCase()] = { ts: Date.now(), status: 'blocked' };
+            });
+            fire(['marks']);
+          }, 600);
+          setTimeout(function () { cb({ ok: true, queued: n }); }, 30);
+          return;
+        }
+        if (msg && msg.type === 'GET_STATE') { cb({ ok: true, state: { queueLength: store.queue.length } }); return; }
+        if (msg && msg.type === 'RESUME_QUEUE') { cb({ ok: true }); return; }
+        cb({ ok: false });
+      }
+    },
+    storage: {
+      local: {
+        get: function (keys, cb) {
+          var out = {};
+          (Array.isArray(keys) ? keys : [keys]).forEach(function (k) { if (k in store) out[k] = store[k]; });
+          setTimeout(function () { cb(out); }, 0);
+        },
+        set: function (obj, cb) {
+          Object.keys(obj).forEach(function (k) { store[k] = obj[k]; });
+          setTimeout(function () { fire(Object.keys(obj)); if (cb) cb(); }, 0);
+        }
+      },
+      onChanged: { addListener: function (fn) { listeners.push(fn); }, removeListener: function (fn) { listeners = listeners.filter(function (f) { return f !== fn; }); } }
+    }
+  };
+  // 模拟已登录（ct0 cookie）
+  try { Object.defineProperty(document, 'cookie', { get: function () { return 'ct0=fixture-csrf-token; auth_token=fixture'; }, configurable: true }); } catch (e) {}
+})();
+
+/* ---------- 样本数据（1 高亮 / 2 高亮 / 3 高亮 / 4 正常 / 5 高亮 / 6 正常 / 7 正常） ---------- */
+var SAMPLES = [
+  { n: '1 · 福利上门小玉', h: 'spamqueen88', t: '小姐姐看过来呀，看我主页有惊喜哦～每晚八点直播' },
+  { n: '2 · 同城外围', h: 'sugar_qiqi', t: '同城约，学生妹兼职，全程一对一，包夜详谈' },
+  { n: '3 · 全角链接引流', h: 'free_res_9x', t: '资源自取：ｈｔｔｐｓ://bit.ly/xxxxx 免费领' },
+  { n: '4 · 正常路人', h: 'normal_user01', t: '这条视频拍得太好了，构图和光影都很舒服，转发了' },
+  { n: '5 · 昵称可疑', h: 'jade_520', t: '晚上有空吗，聊聊天', nick: '上门服务小玉88997' },
+  { n: '6 · 币圈正常讨论', h: 'crypto_bro', t: '这个项目一级市场挺火的，不过我还是只玩现货' },
+  { n: '7 · 正常求助', h: 'designer_li', t: '需要这套模板的同学私信我，看到就回' }
+];
+
+var feed = document.getElementById('feed');
+SAMPLES.forEach(function (s) {
+  var a = document.createElement('article');
+  a.setAttribute('data-testid', 'tweet');
+  a.innerHTML =
+    '<div class="u"><a href="/' + s.h + '">' + (s.nick || s.n) + '</a>' +
+    '<span class="handle">@' + s.h + ' · 1小时</span></div>' +
+    '<div data-testid="tweetText"></div>';
+  a.querySelector('[data-testid="tweetText"]').textContent = s.t;
+  feed.appendChild(a);
+});
+</script>
+
+<!-- 与 manifest.json 相同顺序加载真实代码 -->
+<script src="../src/core/normalize.js"></script>
+<script src="../src/core/rules.js"></script>
+<script src="../src/core/auth.js"></script>
+<script src="../src/core/detector.js"></script>
+<script src="../src/core/storage.js"></script>
+<script src="../src/content/ui.js"></script>
+<script src="../src/content/main.js"></script>
+
+<!-- ?autoblock=1：自动点击第一个「拉黑」与「一键清理」，验证 blocked 状态流转（仅测试用） -->
+<script>
+if (location.search.indexOf('autoblock') !== -1) {
+  setTimeout(function () {
+    var btn = document.querySelector('.tz-btn-block');
+    if (btn) btn.click();
+  }, 800);
+  setTimeout(function () {
+    var clear = document.querySelector('#tz-badge .tz-clear');
+    if (clear && !clear.disabled) clear.click();
+  }, 1600);
+}
+</script>
+</body>
+</html>
