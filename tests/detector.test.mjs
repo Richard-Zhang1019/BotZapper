@@ -81,7 +81,7 @@ test('自定义词：强信号单词即触发', () => {
     { pattern: '接推广', weight: 4 }
   ]);
   assert.ok(r.flagged);
-  assert.ok(r.hits.some(h => h.key === 'c:接推广' && h.label === '自定义词'));
+  assert.ok(r.hits.some(h => h.weight === 4 && h.label === '自定义词' && h.where === 'text'));
 });
 
 test('自定义词：中信号需组合，与内置词同形时用户权重覆盖内置', () => {
@@ -133,4 +133,48 @@ test('炮友单词不触发，组合信号触发；破处单词即触发', () =>
 
   const pochu = analyze({ text: '同城免费破处', displayName: 'x' }, STD);
   assert.ok(pochu.flagged); // 破处(4)
+});
+
+// —— P1：复读信号与远程词库 ——
+
+test('复读信号(+2)作为组合信号触发，短语过短不参与聚类', () => {
+  const text = { text: '速上车，进裙看福利', displayName: '路人甲' }; // 上车1+福利1=2
+  assert.ok(!analyze(text, STD).flagged);
+  assert.ok(analyze(text, STD, null, { repeatedText: true }).flagged); // +复读2 = 4
+  assert.ok(analyze(text, STD, null, { repeatedText: true }).hits.some(h => h.key === 'repetition'));
+});
+
+test('extraRules 对象形式：远程文本词 + 远程昵称词 + 标签', () => {
+  const r = analyze({ text: '这个可以有', displayName: '小雪嗯嗯' }, STD, {
+    text: [{ pattern: '这个可以有', weight: 4, label: '远程词库' }],
+    name: [{ pattern: '小雪', weight: 2, label: '远程词库' }]
+  });
+  assert.ok(r.flagged);
+  assert.ok(r.hits.some(h => h.label === '远程词库' && h.where === 'text'));
+  assert.ok(r.hits.some(h => h.where === 'name'));
+});
+
+test('extraRules 同形覆盖：后来者优先（自定义覆盖远程）', () => {
+  const r = analyze({ text: '福利时间', displayName: 'x' }, STD, [
+    { pattern: '福利', weight: 4, label: '远程词库' },
+    { pattern: '福利', weight: 1, label: '自定义词' }
+  ]);
+  assert.equal(r.score, 1); // 自定义(1) 最终覆盖远程(4)与内置(1)，且只计一次
+  assert.ok(!r.flagged);
+});
+
+test('validateRemote：结构校验、权重钳制、拒绝空版本', () => {
+  const rules = globalThis.BotZapper.rules;
+  const good = rules.validateRemote({
+    version: '2026.10.01',
+    textRules: [{ pattern: ' ok词 ', weight: 9 }, { pattern: '', weight: 2 }, { pattern: '好词' }],
+    nameRules: 'garbage'
+  });
+  assert.ok(good.ok);
+  assert.equal(good.version, '2026.10.01');
+  assert.deepEqual(good.textRules.map(r => [r.pattern, r.weight]), [['ok词', 2], ['好词', 2]]);
+  assert.deepEqual(good.nameRules, []);
+
+  assert.ok(!rules.validateRemote({ textRules: [] }).ok); // 缺版本号
+  assert.ok(!rules.validateRemote(null).ok);
 });

@@ -14,13 +14,20 @@
 
   var DEFAULT_THRESHOLD = 3; // 标准（standard）档
 
+  function clampWeight(w) {
+    var n = Number(w);
+    return (n === 1 || n === 2 || n === 4) ? n : 2;
+  }
+
   /**
    * @param {{text: string, displayName: string}} input
    * @param {number} [threshold]
-   * @param {Array<{pattern:string, weight:number}>} [customRules] 用户自定义违规词
+   * @param {Array|{text:Array,name:Array}} [extraRules] 额外词库（远程+自定义合并）。
+   *   数组形式视作纯文本词（向后兼容）；对象形式 {text,name}。同形 pattern 后来者覆盖内置/先前项。
+   * @param {{repeatedText?:boolean}} [signals] 页面级信号（复读检测等）
    * @returns {{score:number, threshold:number, flagged:boolean, hits:Array<{key:string,weight:number,label:string,where:string}>}}
    */
-  function analyze(input, threshold, customRules) {
+  function analyze(input, threshold, extraRules, signals) {
     threshold = typeof threshold === 'number' ? threshold : DEFAULT_THRESHOLD;
     var hits = [];
     var score = 0;
@@ -37,30 +44,32 @@
     var text = NZ.normalize(input.text || '');
     var name = NZ.normalize(input.displayName || '');
 
-    // 文本短语规则（compact 形态）+ 自定义违规词
-    // 同形词：用户设置的权重覆盖内置权重（用户意图优先）；其余自定义词追加
-    if (customRules && customRules.length) {
+    var extraText = Array.isArray(extraRules) ? extraRules : (extraRules && extraRules.text) || [];
+    var extraName = Array.isArray(extraRules) ? [] : (extraRules && extraRules.name) || [];
+
+    // 文本短语规则（compact 形态）；extraRules 与内置同形时覆盖权重与标签（后来者优先）
+    if (extraText.length) {
       var builtinPat = {};
       for (var b = 0; b < RULES.textRules.length; b++) builtinPat[RULES.textRules[b].pattern] = true;
-      var customByPat = {};
-      var extraCustom = [];
-      for (var c = 0; c < customRules.length; c++) {
-        var pat = NZ.normalize(customRules[c].pattern).compact;
-        if (!pat || customByPat[pat]) continue;
-        customByPat[pat] = customRules[c].weight;
-        if (!builtinPat[pat]) {
-          extraCustom.push({ key: 'c:' + pat, weight: customRules[c].weight, label: '自定义词', pattern: pat });
-        }
+      var byPat = {};
+      for (var c = 0; c < extraText.length; c++) {
+        var pat = NZ.normalize(extraText[c].pattern).compact;
+        if (!pat) continue;
+        byPat[pat] = { weight: clampWeight(extraText[c].weight), label: extraText[c].label || '自定义词' };
       }
       for (var i = 0; i < RULES.textRules.length; i++) {
         var r2 = RULES.textRules[i];
-        var eff = customByPat.hasOwnProperty(r2.pattern)
-          ? { key: r2.key, weight: customByPat[r2.pattern], label: r2.label, pattern: r2.pattern }
+        var o = byPat[r2.pattern];
+        var eff = o
+          ? { key: r2.key, weight: o.weight, label: o.label, pattern: r2.pattern }
           : r2;
         if (text.compact.indexOf(eff.pattern) !== -1) addHit(eff, 'text');
       }
-      for (var e = 0; e < extraCustom.length; e++) {
-        if (text.compact.indexOf(extraCustom[e].pattern) !== -1) addHit(extraCustom[e], 'text');
+      for (var p in byPat) {
+        if (builtinPat[p]) continue; // 同形词已在上方以覆盖方式计分，避免重复
+        if (text.compact.indexOf(p) !== -1) {
+          addHit({ key: 'x:' + p, weight: byPat[p].weight, label: byPat[p].label, pattern: p }, 'text');
+        }
       }
     } else {
       for (var j = 0; j < RULES.textRules.length; j++) {
@@ -80,7 +89,22 @@
     for (var k = 0; k < RULES.nameRules.length; k++) {
       if (name.compact.indexOf(RULES.nameRules[k].pattern) !== -1) addHit(RULES.nameRules[k], 'name');
     }
+    // 额外昵称规则（远程词库）：与内置同形时跳过，避免重复计分
+    if (extraName.length) {
+      var builtinName = {};
+      for (var n2 = 0; n2 < RULES.nameRules.length; n2++) builtinName[RULES.nameRules[n2].pattern] = true;
+      for (var n3 = 0; n3 < extraName.length; n3++) {
+        var np = NZ.normalize(extraName[n3].pattern).compact;
+        if (!np || builtinName[np]) continue;
+        if (name.compact.indexOf(np) !== -1) {
+          addHit({ key: 'xn:' + np, weight: clampWeight(extraName[n3].weight), label: extraName[n3].label || '远程词库' }, 'name');
+        }
+      }
+    }
     if (/\d{5,}/.test(name.norm)) addHit(RULES.metaRules.nameDigits, 'name');
+
+    // 页面级信号（复读检测等）
+    if (signals && signals.repeatedText) addHit(RULES.metaRules.repetition, 'meta');
 
     return { score: score, threshold: threshold, flagged: score >= threshold, hits: hits };
   }

@@ -103,15 +103,52 @@
   var metaRules = {
     invisible: { key: 'invisible', weight: 1, label: '隐形字符' },
     fwUrl: { key: 'fwurl', weight: 3, label: '全角伪装链接' },
-    nameDigits: { key: 'namedigits', weight: 1, label: '昵称含联系号' }
+    nameDigits: { key: 'namedigits', weight: 1, label: '昵称含联系号' },
+    // 同页多账号复读同一文本（≥3 次），机器刷评的强特征；作为组合信号(+2)防梗刷屏误伤
+    repetition: { key: 'repetition', weight: 2, label: '同页复读' }
   };
 
   var api = {
-    version: '2026.09.16.1',
+    version: '2026.09.16.2',
     textRules: textRules,
     regexRules: regexRules,
     nameRules: nameRules,
-    metaRules: metaRules
+    metaRules: metaRules,
+
+    /**
+     * 校验远程词库 JSON（规则热更新）。
+     * 安全约束：远程规则只接受纯文本 pattern（compact 后 indexOf 匹配），
+     * 不接受正则——避免远端注入 ReDoS。权重钳制到 {1,2,4}，数量设上限。
+     * @returns {{ok:boolean, reason?:string, version?:string, textRules?:Array, nameRules?:Array}}
+     */
+    validateRemote: function (data) {
+      if (!data || typeof data !== 'object') return { ok: false, reason: 'not_object' };
+      var version = String(data.version || '').slice(0, 40);
+      if (!version) return { ok: false, reason: 'no_version' };
+
+      function pickWeight(w) {
+        var n = Number(w);
+        return (n === 1 || n === 2 || n === 4) ? n : 2;
+      }
+      function pickList(raw, max, label) {
+        var out = [];
+        if (!Array.isArray(raw)) return out;
+        for (var i = 0; i < raw.length && out.length < max; i++) {
+          var item = raw[i];
+          var pattern = item && typeof item.pattern === 'string' ? item.pattern.trim().slice(0, 40) : '';
+          if (!pattern) continue;
+          out.push({ pattern: pattern, weight: pickWeight(item.weight), label: label });
+        }
+        return out;
+      }
+
+      return {
+        ok: true,
+        version: version,
+        textRules: pickList(data.textRules, 400, '远程词库'),
+        nameRules: pickList(data.nameRules, 200, '远程词库')
+      };
+    }
   };
 
   root.BotZapper = root.BotZapper || {};
