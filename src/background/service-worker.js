@@ -16,9 +16,42 @@
 importScripts('../core/normalize.js', '../core/rules.js', '../core/auth.js', '../core/storage.js');
 
 var BLOCK_API = 'https://x.com' + self.BotZapper.auth.BLOCK_PATH;
+var UNBLOCK_API = 'https://x.com/i/api/1.1/blocks/destroy.json';
 var MAX_ATTEMPTS = 3;
+var RULES_TTL_MS = 24 * 60 * 60 * 1000; // 远程规则拉取周期
 
 var processing = false;
+
+/**
+ * 规则热更新：拉取远程词库 JSON（GitHub Raw / jsDelivr 均带开放 CORS），
+ * 经 validateRemote 结构校验后落盘。失败保留上一次的可用副本。
+ */
+async function maybeUpdateRules(force) {
+  var BZS = self.BotZapper.storage;
+  var settings = await BZS.getSettings();
+  var url = (settings.remoteRulesUrl || '').trim();
+  if (!url) return { ok: false, reason: 'disabled' };
+
+  var current = await BZS.getRemoteRules();
+  if (!force && current.fetchedAt && Date.now() - current.fetchedAt < RULES_TTL_MS) {
+    return { ok: true, cached: true, version: current.data && current.data.version };
+  }
+
+  try {
+    var res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) return { ok: false, reason: 'http_' + res.status };
+    var data = await res.json();
+    var validated = self.BotZapper.rules.validateRemote(data);
+    if (!validated.ok) return { ok: false, reason: validated.reason };
+    await BZS.saveRemoteRules({
+      fetchedAt: Date.now(),
+      data: { version: validated.version, textRules: validated.textRules, nameRules: validated.nameRules }
+    });
+    return { ok: true, version: validated.version };
+  } catch (e) {
+    return { ok: false, reason: 'network' };
+  }
+}
 
 function sleep(ms) {
   return new Promise(function (r) { setTimeout(r, ms); });
@@ -48,9 +81,10 @@ async function processQueue() {
       }
       if (state.paused && state.reason === 'auth_error') break; // 需用户在 popup 手动恢复（会话已刷新）
 
-      // 每日限额：到量即停（不设 paused，次日 stats 归零后自然恢复）
+      // 每日限额：只对拉黑任务生效（撤销不占额度）；到量即停，次日 stats 归零后自然恢复
       var stats = await BZS.getStats();
-      if (stats.dailyBlocked >= settings.dailyLimit) {
+      var hasBlockingJobs = queue.some(function (j) { return j.action !== 'unblock' && !j.processing; });
+      if (hasBlockingJobs && stats.dailyBlocked >= settings.dailyLimit) {
         await BZS.setQueueState({ reason: 'daily_limit' });
         break;
       }
@@ -89,13 +123,22 @@ async function processQueue() {
       }
       await BZS.setQueue(rest);
 
-      if (outcome.status === 'blocked') {
-        await BZS.markBlocked(job.screenName, 'blocked');
-        await BZS.bumpStats({ total: 1, daily: 1 });
+      var isUnblock = job.action === 'unblock';
+      if (outcome.status === 'blocked') { // blocked=接口调用成功（对 unblock 即撤销成功）
+        if (isUnblock) {
+          await BZS.removeMark(job.screenName);
+        } else {
+          await BZS.markBlocked(job.screenName, 'blocked');
+          await BZS.bumpStats({ total: 1, daily: 1 });
+        }
         await BZS.setQueueState({ reason: null, lastError: null });
       } else if (outcome.status === 'not_found') {
-        // 账号已注销/被封，无需再拉黑，本地打标即可
-        await BZS.markBlocked(job.screenName, 'not_found');
+        // 账号已注销/被封：拉黑无需再发请求；撤销则视为目标已不在黑名单，清掉本地标记
+        if (isUnblock) {
+          await BZS.removeMark(job.screenName);
+        } else {
+          await BZS.markBlocked(job.screenName, 'not_found');
+        }
       } else if (outcome.status === 'auth_error') {
         job.processing = false;
         await BZS.setQueue(queue);
@@ -126,14 +169,17 @@ async function processQueue() {
 }
 
 /**
- * 拉黑单个账号。优先让「发起任务的那个标签页」从页面同源上下文发请求
+ * 对单账号执行队列任务（block=拉黑 / unblock=撤销拉黑）。
+ * 优先让「发起任务的那个标签页」从页面同源上下文发请求
  * （cookie 附着行为最有保证），标签页已关闭时由 SW 直接请求兜底。
  */
 async function blockUser(job) {
+  var isUnblock = job.action === 'unblock';
   if (typeof job.tabId === 'number') {
+    var fireType = isUnblock ? 'FIRE_UNBLOCK' : 'FIRE_BLOCK';
     var viaTab = await new Promise(function (resolve) {
       try {
-        chrome.tabs.sendMessage(job.tabId, { type: 'FIRE_BLOCK', screenName: job.screenName }, function (res) {
+        chrome.tabs.sendMessage(job.tabId, { type: fireType, screenName: job.screenName }, function (res) {
           void chrome.runtime.lastError;
           resolve(res && res.status ? res : null);
         });
@@ -144,23 +190,52 @@ async function blockUser(job) {
     if (viaTab) return viaTab;
   }
 
-  var auth = self.BotZapper.auth;
-  if (!job.csrf) return { status: 'auth_error' };
+  // 兜底：SW 直接请求（popup 发起的任务无标签页，csrf 取自内容脚本缓存的会话）
+  var csrf = job.csrf || await self.BotZapper.storage.getSession().then(function (s) { return s.csrf; });
+  if (!csrf) return { status: 'auth_error' };
   try {
-    var res = await fetch(BLOCK_API, {
+    var res = await fetch(isUnblock ? UNBLOCK_API : BLOCK_API, {
       method: 'POST',
       credentials: 'include',
       headers: {
-        'authorization': 'Bearer ' + auth.WEB_BEARER,
-        'x-csrf-token': job.csrf,
+        'authorization': 'Bearer ' + self.BotZapper.auth.WEB_BEARER,
+        'x-csrf-token': csrf,
         'content-type': 'application/x-www-form-urlencoded'
       },
       body: new URLSearchParams({ screen_name: job.screenName, skip_status: '1' }).toString()
     });
-    return auth.mapResponse(res);
+    return self.BotZapper.auth.mapResponse(res);
   } catch (e) {
     return { status: 'network_error' };
   }
+}
+
+function enqueueUsers(msg, sender, action) {
+  var BZS = self.BotZapper.storage;
+  return BZS.getQueue().then(function (queue) {
+    var existing = {};
+    queue.forEach(function (j) {
+      // 同一账号同一动作去重；拉黑与撤销是相反操作，允许共存（后入队者后执行，符合操作顺序）
+      existing[j.screenName.toLowerCase() + ':' + j.action] = true;
+    });
+    var added = 0;
+    (msg.users || []).forEach(function (u) {
+      var sn = String(u.screenName || '').toLowerCase();
+      var key = sn + ':' + action;
+      if (!sn || existing[key]) return;
+      existing[key] = true;
+      queue.push({
+        id: Date.now() + '-' + Math.random().toString(36).slice(2),
+        action: action,
+        screenName: sn,
+        csrf: msg.csrf,
+        tabId: sender && sender.tab ? sender.tab.id : null,
+        attempts: 0, processing: false, ts: Date.now()
+      });
+      added++;
+    });
+    return BZS.setQueue(queue).then(function () { return added; });
+  });
 }
 
 self.chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
@@ -168,28 +243,17 @@ self.chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
     var BZS = self.BotZapper.storage;
     if (!msg || typeof msg.type !== 'string') return sendResponse({ ok: false });
 
-    if (msg.type === 'ENQUEUE_BLOCKS') {
-      var queue = await BZS.getQueue();
-      var existing = {};
-      queue.forEach(function (j) { existing[j.screenName.toLowerCase()] = true; });
-      var added = 0;
-      (msg.users || []).forEach(function (u) {
-        var sn = String(u.screenName || '').toLowerCase();
-        if (!sn || existing[sn]) return;
-        existing[sn] = true;
-        queue.push({
-          id: Date.now() + '-' + Math.random().toString(36).slice(2),
-          screenName: sn,
-          csrf: msg.csrf,
-          tabId: sender && sender.tab ? sender.tab.id : null,
-          attempts: 0, processing: false, ts: Date.now()
-        });
-        added++;
-      });
-      await BZS.setQueue(queue);
+    if (msg.type === 'ENQUEUE_BLOCKS' || msg.type === 'ENQUEUE_UNBLOCKS') {
+      var action = msg.type === 'ENQUEUE_UNBLOCKS' ? 'unblock' : 'block';
+      var added = await enqueueUsers(msg, sender, action);
       // 新任务入队可能发生在熔断结束后：清掉过期的 rate_limit 暂停标记，交给 processQueue 判断
       await processQueue();
       return sendResponse({ ok: true, queued: added });
+    }
+
+    if (msg.type === 'UPDATE_RULES') {
+      var result = await maybeUpdateRules(true);
+      return sendResponse(result);
     }
 
     if (msg.type === 'RESUME_QUEUE') {
@@ -215,7 +279,10 @@ self.chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
 
 self.chrome.alarms.create('queue-tick', { periodInMinutes: 1 });
 self.chrome.alarms.onAlarm.addListener(function (alarm) {
-  if (alarm.name === 'queue-tick') processQueue();
+  if (alarm.name === 'queue-tick') {
+    processQueue();
+    maybeUpdateRules(false); // 每分钟醒一次时顺带检查规则是否过期（内部有 24h TTL）
+  }
 });
 
 self.chrome.runtime.onInstalled.addListener(function () {

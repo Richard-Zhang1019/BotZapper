@@ -33,7 +33,7 @@
   <section class="card">
     <div class="row between">
       <span class="label">今日已拉黑</span>
-      <span class="value" id="dailyText">0 / 50</span>
+      <span class="value"><span id="dailyText">0 / 50</span> <input type="number" id="dailyLimit" min="1" max="500" title="每日拉黑上限"></span>
     </div>
     <div class="bar"><div class="bar-fill" id="dailyBar"></div></div>
     <div class="row between small">
@@ -64,11 +64,36 @@
 
   <section class="card">
     <div class="row between">
+      <span class="label">规则库</span>
+      <span class="small" id="rulesStatus">内置 v--</span>
+    </div>
+    <div class="cr-input-row">
+      <input type="text" id="remoteUrl" placeholder="远程词库 JSON 地址（GitHub Raw / jsDelivr）" style="flex:1">
+    </div>
+    <div class="row" style="margin-top:6px">
+      <button class="ghost small-ghost" id="saveRemoteUrl">保存地址</button>
+      <button class="ghost small-ghost" id="updateRules">检查更新</button>
+      <span class="small" id="rulesUpdateNote"></span>
+    </div>
+    <p class="hint">远程词库每日自动同步一次，只接受纯文本词条（不含正则），用于热更新对抗黑产变种。</p>
+  </section>
+
+  <section class="card">
+    <div class="row between">
       <span class="label">白名单</span>
       <span class="small" id="wlCount">0 个账号</span>
     </div>
     <ul class="wl" id="wlList"></ul>
     <p class="hint" id="wlEmpty">误判过的账号会永久豁免，在评论的「误判」按钮中添加。</p>
+  </section>
+
+  <section class="card">
+    <div class="row between">
+      <span class="label">最近拉黑</span>
+      <span class="small" id="mbCount">0 个</span>
+    </div>
+    <ul class="wl" id="mbList"></ul>
+    <p class="hint" id="mbEmpty">拉黑记录会出现在这里，误拉黑可一键撤销（撤销同样走限速队列）。</p>
   </section>
 
   <footer class="foot">

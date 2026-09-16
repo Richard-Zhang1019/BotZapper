@@ -24,7 +24,7 @@
 </div>
 <div class="side">
   fixture 说明：本页用假 DOM 模拟 X 结构（含真实页面的头像链接在前细节），加载真实的识别引擎与 UI 代码。<br><br>
-  预期：1/2/3/5/8/9/10 号黄色高亮；4/6/7 号正常显示。
+  预期：1/2/3/5/8/9/10 黄色高亮；11/12/13 因「同页复读」(+2) 组合触发；4/6/7 正常显示。
 </div>
 
 <script>
@@ -46,6 +46,7 @@
   }
   window.chrome = {
     runtime: {
+      id: 'fixture-extension-id',
       lastError: undefined,
       sendMessage: function (msg, cb) {
         if (msg && msg.type === 'ENQUEUE_BLOCKS') {
@@ -95,7 +96,10 @@ var SAMPLES = [
   { n: '7 · 正常求助', h: 'designer_li', t: '需要这套模板的同学私信我，看到就回' },
   { n: '8 · 真实截图样本', h: 'aubreyaibin', t: '不进入生活🙅只进入身体', nick: '雨萱🍑找炮友🍑点主页' },
   { n: '9 · 违规昵称+纯emoji正文', h: 'reginehenjn9r', t: '🤗', nick: '霜霁🍑同城免费破处🍑' },
-  { n: '10 · 违规昵称+纯emoji正文', h: 'clorindade5qjx', t: '🌱', nick: '雪瑶💃女大找炮友💃' }
+  { n: '10 · 违规昵称+纯emoji正文', h: 'clorindade5qjx', t: '🌱', nick: '雪瑶💃女大找炮友💃' },
+  { n: '11 · 复读组A（正常昵称）', h: 'user_aaa11', t: '速上车，进裙看福利', nick: '路人甲' },
+  { n: '12 · 复读组B（正常昵称）', h: 'user_bbb22', t: '速上车，进裙看福利', nick: '路人乙' },
+  { n: '13 · 复读组C（正常昵称）', h: 'user_ccc33', t: '速 上,车～进裙看福利', nick: '路人丙' }
 ];
 
 var feed = document.getElementById('feed');

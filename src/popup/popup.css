@@ -16,6 +16,13 @@ body {
   padding: 14px 16px 10px;
 }
 .logo { width: 30px; height: 30px; border-radius: 7px; flex: none; }
+
+.small-ghost { width: auto; padding: 6px 14px; margin: 0 6px 0 0; }
+#dailyLimit {
+  width: 52px; background: #16181c; color: #e7e9ea;
+  border: 1px solid #3e4144; border-radius: 6px; padding: 2px 6px; font-size: 12px;
+}
+#dailyLimit:focus { outline: none; border-color: #f59e0b; }
 .head h1 { font-size: 17px; font-weight: 800; }
 .head h1 small { font-size: 11px; font-weight: 400; color: #71767b; margin-left: 2px; }
 .tagline { color: #f59e0b; font-size: 11px; margin-top: 1px; }

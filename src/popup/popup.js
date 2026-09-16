@@ -13,6 +13,8 @@
     strict: '严格：单个中信号即标注，可能误伤，请配合「误判」按钮使用。'
   };
 
+  var WEIGHT_NAMES = { 4: '强', 2: '中', 1: '弱' };
+
   function send(msg) {
     return new Promise(function (resolve) {
       if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) {
@@ -23,6 +25,13 @@
         resolve(res || { ok: false });
       });
     });
+  }
+
+  function fmtTime(ts) {
+    if (!ts) return '';
+    var d = new Date(ts);
+    return (d.getMonth() + 1) + '/' + d.getDate() + ' ' +
+      String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
   }
 
   function renderWhitelist(wl) {
@@ -47,8 +56,6 @@
       list.appendChild(li);
     });
   }
-
-  var WEIGHT_NAMES = { 4: '强', 2: '中', 1: '弱' };
 
   function renderCustomRules(rules) {
     var list = $('crList');
@@ -76,27 +83,71 @@
     });
   }
 
-  function addCustomRule() {
-    var input = $('crInput');
-    var pattern = input.value.trim();
-    if (!pattern) return;
-    var weight = Number($('crWeight').value) || 2;
-    BZ.storage.getCustomRules().then(function (all) {
-      all.push({ pattern: pattern, weight: weight, ts: Date.now() });
-      return BZ.storage.saveCustomRules(all);
-    }).then(function () {
-      input.value = '';
-      load();
+  function renderRecentBlocks(marks) {
+    var list = $('mbList');
+    list.innerHTML = '';
+    var entries = Object.keys(marks)
+      .filter(function (k) { return marks[k].status === 'blocked'; })
+      .map(function (k) { return { handle: k, ts: marks[k].ts || 0 }; })
+      .sort(function (a, b) { return b.ts - a.ts; })
+      .slice(0, 20);
+    $('mbCount').textContent = entries.length + ' 个';
+    $('mbEmpty').style.display = entries.length ? 'none' : '';
+    entries.forEach(function (e) {
+      var li = document.createElement('li');
+      var left = document.createElement('span');
+      left.textContent = '@' + e.handle;
+      var tag = document.createElement('span');
+      tag.className = 'wtag';
+      tag.textContent = fmtTime(e.ts);
+      left.appendChild(tag);
+      var undo = document.createElement('button');
+      undo.className = 'del';
+      undo.textContent = '撤销';
+      undo.addEventListener('click', function () {
+        undo.disabled = true;
+        undo.textContent = '撤销中…';
+        BZ.storage.getSession().then(function (session) {
+          if (!session.csrf) {
+            undo.disabled = false;
+            undo.textContent = '撤销';
+            $('mbEmpty').textContent = '尚未检测到 X 登录会话，请先打开一次 x.com。';
+            $('mbEmpty').style.display = '';
+            return;
+          }
+          send({
+            type: 'ENQUEUE_UNBLOCKS',
+            users: [{ screenName: e.handle }],
+            csrf: session.csrf
+          });
+          // 成功后 marks 移除该账号，storage.onChanged 会刷新列表
+        });
+      });
+      li.appendChild(left);
+      li.appendChild(undo);
+      list.appendChild(li);
     });
   }
 
-  function renderState(settings, stats, queueState, wl, cr) {
+  function renderRulesCard(settings, remote) {
+    var status = '内置 v' + BZ.rules.version;
+    if (settings.remoteRulesUrl && remote.data) {
+      status += ' · 远程 v' + remote.data.version + '（' + fmtTime(remote.fetchedAt) + ' 同步）';
+    } else if (settings.remoteRulesUrl) {
+      status += ' · 远程待同步';
+    }
+    $('rulesStatus').textContent = status;
+    if (document.activeElement !== $('remoteUrl')) $('remoteUrl').value = settings.remoteRulesUrl || '';
+  }
+
+  function renderState(settings, stats, queueState, wl, cr, marks, remote) {
     $('enabled').checked = settings.enabled;
     $('sensitivityHint').textContent = HINTS[settings.sensitivity] || '';
     document.querySelectorAll('#sensitivity button').forEach(function (b) {
       b.classList.toggle('active', b.dataset.value === settings.sensitivity);
     });
 
+    if (document.activeElement !== $('dailyLimit')) $('dailyLimit').value = settings.dailyLimit;
     var daily = stats.dailyBlocked + ' / ' + settings.dailyLimit;
     $('dailyText').textContent = daily;
     var pct = Math.min(100, Math.round(stats.dailyBlocked / settings.dailyLimit * 100));
@@ -127,8 +178,10 @@
       $('resumeBtn').classList.add('hidden');
     }
 
+    renderRulesCard(settings, remote);
     renderWhitelist(wl);
     renderCustomRules(cr);
+    renderRecentBlocks(marks);
   }
 
   function load() {
@@ -137,14 +190,11 @@
       BZ.storage.getStats(),
       BZ.storage.getQueueState(),
       BZ.storage.getWhitelist(),
-      BZ.storage.getCustomRules()
-    ]).then(function (r) { renderState(r[0], r[1], r[2], r[3], r[4]); });
+      BZ.storage.getCustomRules(),
+      BZ.storage.getMarks(),
+      BZ.storage.getRemoteRules()
+    ]).then(function (r) { renderState(r[0], r[1], r[2], r[3], r[4], r[5], r[6]); });
   }
-
-  $('crAdd').addEventListener('click', addCustomRule);
-  $('crInput').addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') addCustomRule();
-  });
 
   $('enabled').addEventListener('change', function () {
     BZ.storage.saveSettings({ enabled: this.checked });
@@ -156,6 +206,49 @@
     });
   });
 
+  $('dailyLimit').addEventListener('change', function () {
+    var v = Math.max(1, Math.min(500, Number(this.value) || 50));
+    BZ.storage.saveSettings({ dailyLimit: v }).then(load);
+  });
+
+  $('crAdd').addEventListener('click', addCustomRule);
+  $('crInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') addCustomRule();
+  });
+
+  function addCustomRule() {
+    var input = $('crInput');
+    var pattern = input.value.trim();
+    if (!pattern) return;
+    var weight = Number($('crWeight').value) || 2;
+    BZ.storage.getCustomRules().then(function (all) {
+      all.push({ pattern: pattern, weight: weight, ts: Date.now() });
+      return BZ.storage.saveCustomRules(all);
+    }).then(function () {
+      input.value = '';
+      load();
+    });
+  }
+
+  $('saveRemoteUrl').addEventListener('click', function () {
+    var url = $('remoteUrl').value.trim();
+    BZ.storage.saveSettings({ remoteRulesUrl: url }).then(function () {
+      if (url) send({ type: 'UPDATE_RULES' }).then(load);
+      else load();
+    });
+  });
+
+  $('updateRules').addEventListener('click', function () {
+    var note = $('rulesUpdateNote');
+    note.textContent = '同步中…';
+    send({ type: 'UPDATE_RULES' }).then(function (res) {
+      if (res.ok) note.textContent = res.cached ? '词库已是最新' : '已更新到 v' + res.version;
+      else if (res.reason === 'disabled') note.textContent = '未配置地址';
+      else note.textContent = '失败：' + res.reason;
+      load();
+    });
+  });
+
   $('resumeBtn').addEventListener('click', function () {
     send({ type: 'RESUME_QUEUE' }).then(load);
   });
@@ -163,7 +256,8 @@
   $('rulesVersion').textContent = BZ.rules.version;
 
   BZ.storage.onChange(function (changes) {
-    if (changes.settings || changes.stats || changes.queueState || changes.whitelist || changes.customRules) load();
+    if (changes.settings || changes.stats || changes.queueState || changes.whitelist ||
+        changes.customRules || changes.marks || changes.remoteRules) load();
   });
 
   load();

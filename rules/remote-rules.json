@@ -1,0 +1,8 @@
+{
+  "version": "2026.09.16",
+  "note": "推妖镜远程规则库。发布方法：把本仓库推到 GitHub 后，在扩展弹窗「规则库」中填入本文件的 raw/jsDelivr 地址（如 https://cdn.jsdelivr.net/gh/<user>/BotZapper@main/rules/remote-rules.json），插件每日自动拉取一次。只接受纯文本 pattern（自动做全角/插空/emoji 归一化匹配），不接受正则；weight: 4=强(单词即标黄) 2=中(需组合) 1=弱(辅助)。",
+  "textRules": [
+    { "pattern": "示例词条请删除", "weight": 2 }
+  ],
+  "nameRules": []
+}
