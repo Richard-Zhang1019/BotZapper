@@ -18,6 +18,7 @@
   var settings = Object.assign({}, BZ.storage.DEFAULT_SETTINGS);
   var marks = {};
   var whitelist = {};
+  var customRules = [];         // 用户自定义违规词（弹窗管理，改动即时生效）
   var queueState = BZ.storage.defaultQueueState();
   var stats = { totalBlocked: 0, dailyDate: '', dailyBlocked: 0 };
   var pendingSet = new Set();   // 已入队、等待结果确认的账号
@@ -80,17 +81,32 @@
   // —— DOM 抽取 ——
 
   function extractInfo(article) {
-    var authorLink = null;
+    // 真实 X DOM 中第一个作者链接是头像链接（无文字），因此：
+    //   handle —— 取第一个裸用户链接（含头像链接）的路径
+    //   昵称   —— 优先在 User-Name 容器内找第一个「带文字」的裸用户链接
     var links = article.querySelectorAll('a[href^="/"]');
+    var handle = null;
     for (var i = 0; i < links.length; i++) {
       var m = (links[i].getAttribute('href') || '').match(/^\/([A-Za-z0-9_]{1,15})$/);
-      if (m) { authorLink = links[i]; break; } // DOM 顺序上作者链接最早出现
+      if (m) { handle = m[1]; break; }
     }
-    if (!authorLink) return null;
+    if (!handle) return null;
+
+    var nameEl = article.querySelector('[data-testid="User-Name"]');
+    var nameLinks = nameEl ? nameEl.querySelectorAll('a[href^="/"]') : links;
+    var displayName = '';
+    for (var j = 0; j < nameLinks.length; j++) {
+      var mm = (nameLinks[j].getAttribute('href') || '').match(/^\/([A-Za-z0-9_]{1,15})$/);
+      if (mm) {
+        var t = (nameLinks[j].textContent || '').trim();
+        if (t) { displayName = t.slice(0, 60); break; }
+      }
+    }
+
     var textEl = article.querySelector('[data-testid="tweetText"]');
     return {
-      handle: authorLink.hostname === root.location.hostname ? authorLink.pathname.slice(1) : authorLink.getAttribute('href').slice(1),
-      displayName: (authorLink.textContent || '').trim().slice(0, 60),
+      handle: handle,
+      displayName: displayName,
       text: textEl ? (textEl.innerText || '').slice(0, 2000) : ''
     };
   }
@@ -108,7 +124,7 @@
     if (whitelist[key]) return { state: 'clean', info: info };
     if (marks[key]) return { state: 'blocked', info: info };
 
-    var result = BZ.detector.analyze({ text: info.text, displayName: info.displayName }, threshold());
+    var result = BZ.detector.analyze({ text: info.text, displayName: info.displayName }, threshold(), customRules);
     if (!result.flagged) return { state: 'clean', info: info };
     return { state: 'flag', info: info, result: result };
   }
@@ -224,6 +240,7 @@
       BZ.storage.getSettings().then(function (s) { settings = s; }),
       BZ.storage.getMarks().then(function (m) { marks = m; }),
       BZ.storage.getWhitelist().then(function (w) { whitelist = w; }),
+      BZ.storage.getCustomRules().then(function (c) { customRules = c; }),
       BZ.storage.getQueueState().then(function (q) { queueState = q; }),
       BZ.storage.getStats().then(function (s) { stats = s; })
     ]);
@@ -247,7 +264,7 @@
     observer.observe(DOC.body, { childList: true, subtree: true });
 
     BZ.storage.onChange(function (changes) {
-      var relevant = ['settings', 'marks', 'whitelist', 'queueState', 'stats', 'queue'];
+      var relevant = ['settings', 'marks', 'whitelist', 'customRules', 'queueState', 'stats', 'queue'];
       var touched = relevant.some(function (k) { return changes[k]; });
       if (!touched) return;
       // 拉黑结果确认：marks 出现即移出 pending

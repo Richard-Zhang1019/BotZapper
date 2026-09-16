@@ -7,12 +7,13 @@
   body { background: #000; color: #e7e9ea; font-family: system-ui, -apple-system, "PingFang SC", sans-serif; margin: 0; }
   .timeline { max-width: 600px; margin: 0 auto; border-left: 1px solid #2f3336; border-right: 1px solid #2f3336; min-height: 100vh; padding-bottom: 140px; }
   .pagehead { padding: 12px 16px; font-weight: 800; font-size: 18px; border-bottom: 1px solid #2f3336; position: sticky; top: 0; background: rgba(0,0,0,.85); }
-  article[data-testid="tweet"] { padding: 12px 16px; border-bottom: 1px solid #2f3336; cursor: default; }
+  article[data-testid="tweet"] { position: relative; padding: 12px 16px; border-bottom: 1px solid #2f3336; cursor: default; }
   article[data-testid="tweet"]:hover { background: #080808; }
-  .u { display: flex; gap: 6px; align-items: center; font-size: 15px; margin-bottom: 4px; }
+  .ava { position: absolute; left: 16px; top: 14px; width: 40px; height: 40px; border-radius: 50%; background: #2f3336; }
+  .u { display: flex; gap: 6px; align-items: center; font-size: 15px; margin: 0 0 4px 56px; }
   .u a { color: #e7e9ea; font-weight: 700; text-decoration: none; }
   .u .handle, .u .time { color: #71767b; font-weight: 400; font-size: 15px; }
-  [data-testid="tweetText"] { font-size: 15px; line-height: 1.5; white-space: pre-wrap; }
+  [data-testid="tweetText"] { font-size: 15px; line-height: 1.5; white-space: pre-wrap; margin-left: 56px; }
   .side { position: fixed; right: 24px; top: 16px; color: #71767b; font-size: 12px; max-width: 220px; }
 </style>
 </head>
@@ -22,8 +23,8 @@
   <div id="feed"></div>
 </div>
 <div class="side">
-  fixture 说明：本页用假 DOM 模拟 X 结构，加载真实的识别引擎与 UI 代码。<br><br>
-  预期：1/2/3/5 号黄色高亮；4/6/7 号正常显示。
+  fixture 说明：本页用假 DOM 模拟 X 结构（含真实页面的头像链接在前细节），加载真实的识别引擎与 UI 代码。<br><br>
+  预期：1/2/3/5/8/9/10 号黄色高亮；4/6/7 号正常显示。
 </div>
 
 <script>
@@ -82,7 +83,8 @@
   try { Object.defineProperty(document, 'cookie', { get: function () { return 'ct0=fixture-csrf-token; auth_token=fixture'; }, configurable: true }); } catch (e) {}
 })();
 
-/* ---------- 样本数据（1 高亮 / 2 高亮 / 3 高亮 / 4 正常 / 5 高亮 / 6 正常 / 7 正常） ---------- */
+/* ---------- 样本数据（1/2/3/5/8/9 高亮 / 4/6/7 正常） ----------
+   DOM 结构仿真实 X：头像链接在最前（无文字），昵称在 User-Name 容器内 */
 var SAMPLES = [
   { n: '1 · 福利上门小玉', h: 'spamqueen88', t: '小姐姐看过来呀，看我主页有惊喜哦～每晚八点直播' },
   { n: '2 · 同城外围', h: 'sugar_qiqi', t: '同城约，学生妹兼职，全程一对一，包夜详谈' },
@@ -90,7 +92,10 @@ var SAMPLES = [
   { n: '4 · 正常路人', h: 'normal_user01', t: '这条视频拍得太好了，构图和光影都很舒服，转发了' },
   { n: '5 · 昵称可疑', h: 'jade_520', t: '晚上有空吗，聊聊天', nick: '上门服务小玉88997' },
   { n: '6 · 币圈正常讨论', h: 'crypto_bro', t: '这个项目一级市场挺火的，不过我还是只玩现货' },
-  { n: '7 · 正常求助', h: 'designer_li', t: '需要这套模板的同学私信我，看到就回' }
+  { n: '7 · 正常求助', h: 'designer_li', t: '需要这套模板的同学私信我，看到就回' },
+  { n: '8 · 真实截图样本', h: 'aubreyaibin', t: '不进入生活🙅只进入身体', nick: '雨萱🍑找炮友🍑点主页' },
+  { n: '9 · 违规昵称+纯emoji正文', h: 'reginehenjn9r', t: '🤗', nick: '霜霁🍑同城免费破处🍑' },
+  { n: '10 · 违规昵称+纯emoji正文', h: 'clorindade5qjx', t: '🌱', nick: '雪瑶💃女大找炮友💃' }
 ];
 
 var feed = document.getElementById('feed');
@@ -98,7 +103,8 @@ SAMPLES.forEach(function (s) {
   var a = document.createElement('article');
   a.setAttribute('data-testid', 'tweet');
   a.innerHTML =
-    '<div class="u"><a href="/' + s.h + '">' + (s.nick || s.n) + '</a>' +
+    '<a class="ava" href="/' + s.h + '"></a>' +
+    '<div class="u" data-testid="User-Name"><a href="/' + s.h + '">' + (s.nick || s.n) + '</a>' +
     '<span class="handle">@' + s.h + ' · 1小时</span></div>' +
     '<div data-testid="tweetText"></div>';
   a.querySelector('[data-testid="tweetText"]').textContent = s.t;

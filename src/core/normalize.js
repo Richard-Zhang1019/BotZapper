@@ -12,11 +12,15 @@
   'use strict';
 
   // 零宽/不可见字符：零宽空格、零宽连字、BOM、方向标记、阿拉伯数字符等
-  var INVISIBLE_RE = /[\u200B-\u200F\u2060\u2066-\u2069\uFEFF\u061C]/g;
+  var INVISIBLE_TEST_RE = /[\u200B-\u200F\u2060\u2066-\u2069\uFEFF\u061C]/;
+  var INVISIBLE_STRIP_RE = /[\u200B-\u200F\u2060\u2066-\u2069\uFEFF\u061C]/g;
   // 全角字母（U+FF41–U+FF5A / U+FF21–U+FF3A），出现即视为伪装信号
   var FULLWIDTH_LETTER_RE = /[\uFF21-\uFF3A\uFF41-\uFF5A]/;
   // 标点/符号（中英文），compact 阶段剥离。保留字母数字与 CJK。
   var SEPARATOR_RE = /[\s\u3000!-/:-@[-`{-~\u3001\u3002\u3008-\u3011\u3014\u3015\u301C\u301D\u301E\u30FB\uFF01-\uFF0F\uFF1A-\uFF20\uFF3B-\uFF40\uFF5B-\uFF65\u00B7\u2026\u2013\u2014\u2018\u2019\u201C\u201D\u2022\u2E3A\u2E3B]+/g;
+  // emoji 与符号（含增补平面/变体选择符/私有区图标），同样视为插空噪声
+  var SYMBOL_RE = /[\u2190-\u2BFF\uFE0E\uFE0F\u20E3\u00A9\u00AE\u2122\u2000-\u200A\u202F\u205F]+/g;
+  var EMOJI_RE = /[\u{1F000}-\u{1FFFF}\u{E000}-\u{F8FF}]/gu;
 
   function toHalfWidth(str) {
     var out = '';
@@ -39,11 +43,12 @@
    */
   function normalize(raw) {
     var text = String(raw || '');
-    var hasInvisible = INVISIBLE_RE.test(text);
+    var hasInvisible = INVISIBLE_TEST_RE.test(text);
     var hasFullWidthLetter = FULLWIDTH_LETTER_RE.test(text);
 
-    var norm = toHalfWidth(text).replace(INVISIBLE_RE, '').toLowerCase();
-    var compact = norm.replace(SEPARATOR_RE, '');
+    var norm = toHalfWidth(text).replace(INVISIBLE_STRIP_RE, '').toLowerCase();
+    // compact 再剥离 emoji/符号，对抗「不进入生活👋🙅只进入身体」式穿插
+    var compact = norm.replace(SEPARATOR_RE, '').replace(SYMBOL_RE, '').replace(EMOJI_RE, '');
 
     return { norm: norm, compact: compact, hasInvisible: hasInvisible, hasFullWidthLetter: hasFullWidthLetter };
   }

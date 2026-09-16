@@ -15,7 +15,7 @@ body {
   gap: 10px;
   padding: 14px 16px 10px;
 }
-.logo { font-size: 26px; }
+.logo { width: 30px; height: 30px; border-radius: 7px; flex: none; }
 .head h1 { font-size: 17px; font-weight: 800; }
 .head h1 small { font-size: 11px; font-weight: 400; color: #71767b; margin-left: 2px; }
 .tagline { color: #f59e0b; font-size: 11px; margin-top: 1px; }
@@ -73,5 +73,22 @@ body {
 .wl li:last-child { border-bottom: none; }
 .wl .del { background: none; border: none; color: #71767b; cursor: pointer; font-size: 12px; }
 .wl .del:hover { color: #f4212e; }
+
+.cr-input-row { display: flex; gap: 6px; margin-top: 10px; }
+.cr-input-row input {
+  flex: 1; min-width: 0; background: #16181c; color: #e7e9ea;
+  border: 1px solid #3e4144; border-radius: 8px; padding: 6px 10px; font-size: 13px;
+}
+.cr-input-row input:focus { outline: none; border-color: #f59e0b; }
+.cr-input-row select {
+  background: #16181c; color: #e7e9ea; border: 1px solid #3e4144;
+  border-radius: 8px; padding: 6px 4px; font-size: 12px; cursor: pointer;
+}
+.cr-input-row button {
+  background: #f59e0b; color: #16181c; border: none; border-radius: 8px;
+  padding: 6px 14px; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.cr-input-row button:hover { background: #fbbf24; }
+.wl .wtag { color: #71767b; margin-left: 6px; font-size: 11px; }
 
 .foot { padding: 4px 16px 14px; color: #71767b; font-size: 11px; }

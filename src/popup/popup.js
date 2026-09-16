@@ -48,7 +48,49 @@
     });
   }
 
-  function renderState(settings, stats, queueState, wl) {
+  var WEIGHT_NAMES = { 4: '强', 2: '中', 1: '弱' };
+
+  function renderCustomRules(rules) {
+    var list = $('crList');
+    list.innerHTML = '';
+    $('crCount').textContent = rules.length + ' 个';
+    rules.slice().sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); }).forEach(function (r) {
+      var li = document.createElement('li');
+      var left = document.createElement('span');
+      left.textContent = r.pattern;
+      var tag = document.createElement('span');
+      tag.className = 'wtag';
+      tag.textContent = WEIGHT_NAMES[r.weight] || '中';
+      left.appendChild(tag);
+      var del = document.createElement('button');
+      del.className = 'del';
+      del.textContent = '移除';
+      del.addEventListener('click', function () {
+        BZ.storage.getCustomRules().then(function (all) {
+          return BZ.storage.saveCustomRules(all.filter(function (x) { return x.pattern !== r.pattern; }));
+        }).then(load);
+      });
+      li.appendChild(left);
+      li.appendChild(del);
+      list.appendChild(li);
+    });
+  }
+
+  function addCustomRule() {
+    var input = $('crInput');
+    var pattern = input.value.trim();
+    if (!pattern) return;
+    var weight = Number($('crWeight').value) || 2;
+    BZ.storage.getCustomRules().then(function (all) {
+      all.push({ pattern: pattern, weight: weight, ts: Date.now() });
+      return BZ.storage.saveCustomRules(all);
+    }).then(function () {
+      input.value = '';
+      load();
+    });
+  }
+
+  function renderState(settings, stats, queueState, wl, cr) {
     $('enabled').checked = settings.enabled;
     $('sensitivityHint').textContent = HINTS[settings.sensitivity] || '';
     document.querySelectorAll('#sensitivity button').forEach(function (b) {
@@ -86,6 +128,7 @@
     }
 
     renderWhitelist(wl);
+    renderCustomRules(cr);
   }
 
   function load() {
@@ -93,9 +136,15 @@
       BZ.storage.getSettings(),
       BZ.storage.getStats(),
       BZ.storage.getQueueState(),
-      BZ.storage.getWhitelist()
-    ]).then(function (r) { renderState(r[0], r[1], r[2], r[3]); });
+      BZ.storage.getWhitelist(),
+      BZ.storage.getCustomRules()
+    ]).then(function (r) { renderState(r[0], r[1], r[2], r[3], r[4]); });
   }
+
+  $('crAdd').addEventListener('click', addCustomRule);
+  $('crInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') addCustomRule();
+  });
 
   $('enabled').addEventListener('change', function () {
     BZ.storage.saveSettings({ enabled: this.checked });
@@ -114,7 +163,7 @@
   $('rulesVersion').textContent = BZ.rules.version;
 
   BZ.storage.onChange(function (changes) {
-    if (changes.settings || changes.stats || changes.queueState || changes.whitelist) load();
+    if (changes.settings || changes.stats || changes.queueState || changes.whitelist || changes.customRules) load();
   });
 
   load();

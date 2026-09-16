@@ -26,6 +26,10 @@
     S('qingsewang', '情色网', '色情引流'),
     S('freenudes', 'freenudes', '色情引流'), S('nudesinbio', 'nudesinbio', '色情引流'),
     S('escortservice', 'escortservice', '色情引流'),
+    // —— 2026-09-16 真实样本补充 ——
+    S('zhaopaoyou', '找炮友', '色情引流'), M('paoyou', '炮友', '色情引流'),
+    S('pochu', '破处', '色情引流'),
+    M('dianzhuye', '点主页', '主页导流'), M('zhijinrushenti', '只进入身体', '机器复读'),
     // —— 导流话术（中信号）——
     M('kanwozhuye', '看我主页', '主页导流'), M('zhuyeyou', '主页有', '主页导流'),
     M('kanzhiding', '看置顶', '主页导流'), M('zhidingyou', '置顶有', '主页导流'),
@@ -57,7 +61,7 @@
     W('jianzhi', '兼职', '刷单兼职'), W('rijie', '日结', '刷单兼职'),
     W('telegram', 'telegram', '站外导流'), W('whatsapp', 'whatsapp', '站外导流'),
     W('giveaway', 'giveaway', '疑似钩子'), W('onlyfans', 'onlyfans', '色情引流'),
-    W('linkinbio', 'linkinbio', '主页导流')
+    W('linkinbio', 'linkinbio', '主页导流'), W('tongcheng', '同城', '疑似引流')
   ].map(function (r) { return { key: r.key, weight: r.weight, label: r.label, pattern: r.pattern }; });
 
   // 正则规则：匹配 norm 形态（保留标点，供 URL 类模式使用）
@@ -86,7 +90,14 @@
     { key: 'n_fanyong', weight: 2, label: '金融诈骗', pattern: '返佣' },
     { key: 'n_kaihu', weight: 2, label: '金融诈骗', pattern: '开户' },
     { key: 'n_beitou', weight: 2, label: '金融诈骗', pattern: '倍投' },
-    { key: 'n_daoshi', weight: 1, label: '金融诈骗', pattern: '导师' }
+    { key: 'n_daoshi', weight: 1, label: '金融诈骗', pattern: '导师' },
+    // —— 2026-09-16 真实样本补充 ——
+    { key: 'n_zhaopaoyou', weight: 4, label: '色情引流', pattern: '找炮友' },
+    { key: 'n_paoyou', weight: 2, label: '色情引流', pattern: '炮友' },
+    { key: 'n_pochu', weight: 4, label: '色情引流', pattern: '破处' },
+    { key: 'n_dianzhuye', weight: 2, label: '主页导流', pattern: '点主页' },
+    { key: 'n_nvda', weight: 1, label: '昵称可疑', pattern: '女大' },
+    { key: 'n_tongcheng', weight: 1, label: '疑似引流', pattern: '同城' }
   ];
 
   var metaRules = {
@@ -96,7 +107,7 @@
   };
 
   var api = {
-    version: '2026.09.14.1',
+    version: '2026.09.16.1',
     textRules: textRules,
     regexRules: regexRules,
     nameRules: nameRules,

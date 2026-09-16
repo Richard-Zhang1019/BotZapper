@@ -17,9 +17,10 @@
   /**
    * @param {{text: string, displayName: string}} input
    * @param {number} [threshold]
+   * @param {Array<{pattern:string, weight:number}>} [customRules] 用户自定义违规词
    * @returns {{score:number, threshold:number, flagged:boolean, hits:Array<{key:string,weight:number,label:string,where:string}>}}
    */
-  function analyze(input, threshold) {
+  function analyze(input, threshold, customRules) {
     threshold = typeof threshold === 'number' ? threshold : DEFAULT_THRESHOLD;
     var hits = [];
     var score = 0;
@@ -36,9 +37,35 @@
     var text = NZ.normalize(input.text || '');
     var name = NZ.normalize(input.displayName || '');
 
-    // 文本短语规则（compact 形态）
-    for (var i = 0; i < RULES.textRules.length; i++) {
-      if (text.compact.indexOf(RULES.textRules[i].pattern) !== -1) addHit(RULES.textRules[i], 'text');
+    // 文本短语规则（compact 形态）+ 自定义违规词
+    // 同形词：用户设置的权重覆盖内置权重（用户意图优先）；其余自定义词追加
+    if (customRules && customRules.length) {
+      var builtinPat = {};
+      for (var b = 0; b < RULES.textRules.length; b++) builtinPat[RULES.textRules[b].pattern] = true;
+      var customByPat = {};
+      var extraCustom = [];
+      for (var c = 0; c < customRules.length; c++) {
+        var pat = NZ.normalize(customRules[c].pattern).compact;
+        if (!pat || customByPat[pat]) continue;
+        customByPat[pat] = customRules[c].weight;
+        if (!builtinPat[pat]) {
+          extraCustom.push({ key: 'c:' + pat, weight: customRules[c].weight, label: '自定义词', pattern: pat });
+        }
+      }
+      for (var i = 0; i < RULES.textRules.length; i++) {
+        var r2 = RULES.textRules[i];
+        var eff = customByPat.hasOwnProperty(r2.pattern)
+          ? { key: r2.key, weight: customByPat[r2.pattern], label: r2.label, pattern: r2.pattern }
+          : r2;
+        if (text.compact.indexOf(eff.pattern) !== -1) addHit(eff, 'text');
+      }
+      for (var e = 0; e < extraCustom.length; e++) {
+        if (text.compact.indexOf(extraCustom[e].pattern) !== -1) addHit(extraCustom[e], 'text');
+      }
+    } else {
+      for (var j = 0; j < RULES.textRules.length; j++) {
+        if (text.compact.indexOf(RULES.textRules[j].pattern) !== -1) addHit(RULES.textRules[j], 'text');
+      }
     }
     // 文本正则规则（norm 形态）
     for (var j = 0; j < RULES.regexRules.length; j++) {

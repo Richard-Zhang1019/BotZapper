@@ -7,7 +7,7 @@
 </head>
 <body>
   <header class="head">
-    <span class="logo">🪞</span>
+    <img class="logo" src="../../icons/icon48.png" alt="推妖镜">
     <div>
       <h1>推妖镜 <small>BotZapper</small></h1>
       <p class="tagline">照妖镜一照，妖怪现形</p>
@@ -42,6 +42,24 @@
     </div>
     <p class="warn hidden" id="pauseNote"></p>
     <button class="ghost hidden" id="resumeBtn">恢复队列</button>
+  </section>
+
+  <section class="card">
+    <div class="row between">
+      <span class="label">自定义违规词</span>
+      <span class="small" id="crCount">0 个</span>
+    </div>
+    <div class="cr-input-row">
+      <input type="text" id="crInput" maxlength="40" placeholder="输入词语，如：接推广">
+      <select id="crWeight" title="强：出现即标黄；中：需与其他信号组合；弱：仅辅助加分">
+        <option value="4" selected>强·即标黄</option>
+        <option value="2">中·需组合</option>
+        <option value="1">弱·仅加分</option>
+      </select>
+      <button id="crAdd">添加</button>
+    </div>
+    <ul class="wl" id="crList"></ul>
+    <p class="hint">纯文本包含匹配，自动对抗全角/插空/emoji 混淆，添加后立即生效（无需刷新扩展）。拿不准就选「强」。</p>
   </section>
 
   <section class="card">

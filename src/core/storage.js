@@ -139,6 +139,31 @@
     await rawSet({ queue: jobs || [] });
   }
 
+  // 自定义违规词: [{ pattern, weight, ts }]，weight: 4=强 2=中 1=弱
+  async function getCustomRules() {
+    if (!hasChrome()) return [];
+    var items = await rawGet('customRules');
+    return items.customRules || [];
+  }
+
+  async function saveCustomRules(list) {
+    var seen = {};
+    var out = [];
+    var nz = root.BotZapper && root.BotZapper.normalize;
+    (list || []).forEach(function (r) {
+      var p = String(r.pattern || '').trim().slice(0, 40);
+      if (!p) return;
+      var w = Number(r.weight) || 2;
+      if ([1, 2, 4].indexOf(w) === -1) w = 2;
+      var key = nz ? nz(p).compact.toLowerCase() : p.toLowerCase();
+      if (!key || seen[key]) return;
+      seen[key] = true;
+      out.push({ pattern: p, weight: w, ts: r.ts || Date.now() });
+    });
+    await rawSet({ customRules: out.slice(0, 100) });
+    return out;
+  }
+
   function onChange(callback) {
     if (!hasChrome()) return function () {};
     var listener = function (changes, area) {
@@ -167,6 +192,8 @@
     defaultQueueState: defaultQueueState,
     getQueue: getQueue,
     setQueue: setQueue,
+    getCustomRules: getCustomRules,
+    saveCustomRules: saveCustomRules,
     onChange: onChange
   };
 
