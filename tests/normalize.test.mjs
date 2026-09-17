@@ -32,3 +32,26 @@ test('普通文本不误报隐形/全角特征', () => {
   assert.equal(r.hasInvisible, false);
   assert.equal(r.hasFullWidthLetter, false);
 });
+
+// —— 繁体变体折叠（黑产常用繁体话术）——
+
+test('繁体折叠：约炮/學生妹/上門/電報群 折叠后与简体词库同形', () => {
+  assert.equal(normalize('約炮').compact, '约炮');
+  assert.equal(normalize('學生妹上門服務').compact, '学生妹上门服务');
+  assert.equal(normalize('電報群免費領福利').compact, '电报群免费领福利');
+  assert.equal(normalize('看我主頁').compact, '看我主页');
+});
+
+test('繁体折叠不污染正常内容', () => {
+  // 繁体日常文本折叠为简体但语义不变，不应命中任何规则
+  const r = normalize('這個週末我們一起去後山看風景，很好玩');
+  assert.equal(r.compact, '这个周末我们一起去后山看风景很好玩');
+  assert.equal(r.hasInvisible, false);
+});
+
+test('foldVariants 单独可用且幂等', () => {
+  const fold = normalize.foldVariants;
+  assert.equal(fold('約炮利器'), '约炮利器');
+  assert.equal(fold(fold('約炮利器')), fold('約炮利器'));
+  assert.equal(fold('ABC abc 123'), 'ABC abc 123'); // 半角/英文不受影响
+});

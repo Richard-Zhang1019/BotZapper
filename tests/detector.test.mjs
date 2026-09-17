@@ -190,3 +190,49 @@ test('我福不黑：单词不触发（防真人玩梗误杀），组合复读�
     null, { repeatedText: true });
   assert.ok(bot.flagged); // 我福不黑(2)+同页复读(2)=4，标准档即可识别
 });
+
+// —— 拼音/变体归一化（vx / +v / 薇信 / 繁体）——
+
+test('繁体变体话术折叠后命中内置简体词库', () => {
+  const r = analyze({ text: '小姐姐約炮嗎？免費看片包夜哦', displayName: '上門服務小玉' }, STD);
+  assert.ok(r.flagged);
+  assert.ok(r.hits.some(h => h.key === 'yuepao'));     // 正文 約炮 → 约炮
+  assert.ok(r.hits.some(h => h.key === 'n_shangmen' && h.where === 'name')); // 昵称 折叠后命中
+});
+
+test('vx / v信 单独不触发（中信号防误伤），组合即触发', () => {
+  const lone = analyze({ text: 'vx详聊', displayName: '路人' }, STD);
+  assert.ok(lone.hits.some(h => h.key === 'vx'));
+  assert.ok(!lone.flagged); // 2 分 < 3
+
+  const combo = analyze({ text: 'vx详聊，看我主页有惊喜', displayName: '路人' }, STD);
+  assert.ok(combo.flagged); // vx(2)+看我主页(2)+主页有(2)=6
+
+  const vxin = analyze({ text: '加v信聊', displayName: 'x' }, STD);
+  assert.ok(vxin.hits.some(h => h.key === 'vxin'));
+});
+
+test('「+v / 加v」正则命中，vip 等普通词不误报', () => {
+  const plusv = analyze({ text: '不会的私信我+v', displayName: 'x' }, STD);
+  assert.ok(plusv.hits.some(h => h.key === 'plusv'));
+
+  const jiav = analyze({ text: '加v免费领福利', displayName: 'x' }, STD);
+  assert.ok(jiav.hits.some(h => h.key === 'plusv'));
+
+  const vip = analyze({ text: '这个主播值得充个vip', displayName: 'x' }, STD);
+  assert.ok(!vip.hits.some(h => h.key === 'plusv'));
+});
+
+test('薇信谐音变体命中，正常「薇」字昵称不误伤', () => {
+  const r = analyze({ text: '_details 薇信到我这里来', displayName: 'x' }, STD);
+  assert.ok(r.hits.some(h => h.key === 'weix1'));
+
+  const safe = analyze({ text: '薇娅的直播真好看', displayName: '小薇' }, STD);
+  assert.equal(safe.score, 0);
+});
+
+test('weixin 拼音为弱信号，仅辅助加分', () => {
+  const r = analyze({ text: 'my weixin is paimai88', displayName: 'x' }, STD);
+  assert.ok(r.hits.some(h => h.key === 'weixinpy' && h.weight === 1));
+  assert.ok(!r.flagged); // 1 分 < 3
+});

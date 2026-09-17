@@ -44,6 +44,11 @@
     M('feijihao', '飞机号', '站外导流'), M('tgun', 'tg群', '站外导流'),
     M('qqun', '企鹅群', '站外导流'), M('weiqun', '微信群', '站外导流'),
     M('koukou', '扣扣', '站外导流'),
+    // —— 拼音/谐音变体（vx / +v / 薇信 一族）：中信号，需组合防误伤 ——
+    M('vx', 'vx', '站外导流'), M('vxin', 'v信', '站外导流'),
+    M('weix1', '薇信', '站外导流'), M('weix2', '薇芯', '站外导流'),
+    M('weix3', '威芯', '站外导流'), M('weix4', '微芯', '站外导流'),
+    W('weixinpy', 'weixin', '站外导流'),
     M('mianfeiling', '免费领', '福利钩子'), M('lingfuli', '领福利', '福利钩子'),
     M('xiandaibu', '内部线报', '福利钩子'),
     M('daidan', '带单', '金融诈骗'), M('dainihuiben', '带你回本', '金融诈骗'),
@@ -70,6 +75,9 @@
   // 正则规则：匹配 norm 形态（保留标点，供 URL 类模式使用）
   var regexRules = [
     { key: 'tme', weight: 2, label: '站外导流', re: /t\.me\//i },
+    // 「+v / 加v / +vx」：+ 与 v 在 compact 中会失散，只能匹配保留标点的 norm 形态；
+    // 尾部负向断言排除 vip/vo 之类的普通词
+    { key: 'plusv', weight: 2, label: '站外导流', re: /(?:\+|加)\s*v(?:x)?(?![a-z0-9])/i },
     { key: 'shortlink', weight: 1, label: '短链可疑', re: /(?:bit\.ly|cutt\.ly|tinyurl|is\.gd|shorte\.st|adf\.ly|clck\.ru|rb\.gy|ow\.ly|buff\.ly|shorturl\.at)\//i },
     { key: 'ofsite', weight: 2, label: '色情引流', re: /(?:onlyfans\.com|fansly\.com)/i }
   ];
@@ -112,7 +120,7 @@
   };
 
   var api = {
-    version: '2026.09.16.3',
+    version: '2026.09.17.1',
     textRules: textRules,
     regexRules: regexRules,
     nameRules: nameRules,
