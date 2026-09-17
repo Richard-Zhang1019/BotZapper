@@ -13,11 +13,10 @@
  */
 'use strict';
 
-importScripts('../core/normalize.js', '../core/rules.js', '../core/auth.js', '../core/storage.js');
+importScripts('../core/normalize.js', '../core/rules.js', '../core/auth.js', '../core/storage.js', '../core/queue-policy.js');
 
 var BLOCK_API = 'https://x.com' + self.BotZapper.auth.BLOCK_PATH;
 var UNBLOCK_API = 'https://x.com/i/api/1.1/blocks/destroy.json';
-var MAX_ATTEMPTS = 3;
 var RULES_TTL_MS = 24 * 60 * 60 * 1000; // 远程规则拉取周期
 
 var processing = false;
@@ -64,102 +63,68 @@ function rand(min, max) {
 async function processQueue() {
   if (processing) return;
   processing = true;
+  var QP = self.BotZapper.queuePolicy;
   try {
     while (true) {
       var BZS = self.BotZapper.storage;
       var queue = await BZS.getQueue();
       var settings = await BZS.getSettings();
       var state = await BZS.getQueueState();
-
-      if (queue.length === 0) break;
-
-      // 熔断期未到 → 退出，等下一个 alarm tick 再查
-      if (state.paused && state.reason === 'rate_limit' && Date.now() < state.pausedUntil) break;
-      // 熔断冷却结束 → 自动恢复
-      if (state.paused && state.reason === 'rate_limit' && Date.now() >= state.pausedUntil) {
-        state = await BZS.setQueueState({ paused: false, reason: null, pausedUntil: 0 });
-      }
-      if (state.paused && state.reason === 'auth_error') break; // 需用户在 popup 手动恢复（会话已刷新）
-
-      // 每日限额：只对拉黑任务生效（撤销不占额度）；到量即停，次日 stats 归零后自然恢复
       var stats = await BZS.getStats();
-      var hasBlockingJobs = queue.some(function (j) { return j.action !== 'unblock' && !j.processing; });
-      if (hasBlockingJobs && stats.dailyBlocked >= settings.dailyLimit) {
+
+      var decision = QP.evaluateNext({ queue: queue, settings: settings, state: state, stats: stats, now: Date.now() });
+
+      if (decision.verdict === 'idle' || decision.verdict === 'wait_cooldown' || decision.verdict === 'wait_auth') break;
+
+      if (decision.verdict === 'resume') {
+        // 熔断冷却结束：清掉暂停标记，回循环顶部按正常逻辑继续
+        await BZS.setQueueState({ paused: false, reason: null, pausedUntil: 0 });
+        continue;
+      }
+      if (decision.verdict === 'daily_limit') {
         await BZS.setQueueState({ reason: 'daily_limit' });
         break;
       }
 
-      // 取第一个非处理中的任务
-      var job = null;
-      for (var i = 0; i < queue.length; i++) {
-        if (!queue[i].processing) { job = queue[i]; break; }
-      }
-      if (!job) break;
-
-      // 标记 processing 并持久化，SW 中途被杀也不至于重复请求
+      // run_job：标记 processing 并持久化，SW 中途被杀也不至于重复请求；
+      // 遗留的 processing（持久化恢复）在这里一并覆盖并重新计时
+      var job = decision.job;
       job.processing = true;
+      job.startedAt = Date.now();
       await BZS.setQueue(queue);
 
       await sleep(rand(settings.minDelayMs, settings.maxDelayMs));
 
       var outcome = await blockUser(job);
+      var plan = QP.planOutcome(job, outcome, { cooldownMs: BZS.RATE_LIMIT_COOLDOWN_MS });
 
-      if (outcome.status === 'rate_limited') {
-        // 熔断：任务放回队首，冷却后重试
-        job.processing = false;
-        await BZS.setQueue(queue);
-        await BZS.setQueueState({
-          paused: true, reason: 'rate_limit',
-          pausedUntil: Date.now() + BZS.RATE_LIMIT_COOLDOWN_MS,
-          lastError: 'rate_limit'
-        });
-        continue;
-      }
-
-      // 从队列移除
-      var rest = [];
-      for (var k = 0; k < queue.length; k++) {
-        if (queue[k].id !== job.id) rest.push(queue[k]);
-      }
-      await BZS.setQueue(rest);
-
-      var isUnblock = job.action === 'unblock';
-      if (outcome.status === 'blocked') { // blocked=接口调用成功（对 unblock 即撤销成功）
-        if (isUnblock) {
-          await BZS.removeMark(job.screenName);
-        } else {
-          await BZS.markBlocked(job.screenName, 'blocked');
-          await BZS.bumpStats({ total: 1, daily: 1 });
+      // complete/drop：任务离队；requeue：原任务留在队列里改状态后整体写回
+      if (plan.kind !== 'requeue') {
+        var rest = [];
+        for (var k = 0; k < queue.length; k++) {
+          if (queue[k].id !== job.id) rest.push(queue[k]);
         }
+        await BZS.setQueue(rest);
+      }
+
+      if (plan.kind === 'complete') {
+        if (plan.effects.removeMark) await BZS.removeMark(job.screenName);
+        if (plan.effects.markStatus) await BZS.markBlocked(job.screenName, plan.effects.markStatus);
+        if (plan.effects.bumpStats) await BZS.bumpStats({ total: 1, daily: 1 });
         await BZS.setQueueState({ reason: null, lastError: null });
-      } else if (outcome.status === 'not_found') {
-        // 账号已注销/被封：拉黑无需再发请求；撤销则视为目标已不在黑名单，清掉本地标记
-        if (isUnblock) {
-          await BZS.removeMark(job.screenName);
-        } else {
-          await BZS.markBlocked(job.screenName, 'not_found');
-        }
-      } else if (outcome.status === 'auth_error') {
+      } else if (plan.kind === 'drop') {
+        await BZS.markBlocked(job.screenName, plan.markStatus);
+      } else { // requeue
         job.processing = false;
+        if (plan.attempts != null) job.attempts = plan.attempts;
         await BZS.setQueue(queue);
-        await BZS.setQueueState({
-          paused: true, reason: 'auth_error', pausedUntil: 0,
-          lastError: '登录状态失效，请刷新 X 页面后在弹窗恢复队列'
-        });
-        continue;
-      } else {
-        // 网络错误等临时失败：重试计数
-        job.attempts = (job.attempts || 0) + 1;
-        job.processing = false;
-        if (job.attempts >= MAX_ATTEMPTS) {
-          var drop = [];
-          for (var m = 0; m < queue.length; m++) {
-            if (queue[m].id !== job.id) drop.push(queue[m]);
-          }
-          await BZS.setQueue(drop);
-          await BZS.markBlocked(job.screenName, 'failed');
-        } else {
-          await BZS.setQueue(queue);
+        if (plan.pause) {
+          await BZS.setQueueState({
+            paused: true,
+            reason: plan.pause.reason,
+            pausedUntil: plan.pause.cooldownMs ? Date.now() + plan.pause.cooldownMs : 0,
+            lastError: plan.pause.lastError
+          });
         }
       }
     }
