@@ -14,6 +14,7 @@
   };
 
   var WEIGHT_NAMES = { 4: '强', 2: '中', 1: '弱' };
+  var WHERE_NAMES = { text: '正文', name: '昵称', meta: '元特征' };
 
   function send(msg) {
     return new Promise(function (resolve) {
@@ -140,6 +141,82 @@
     if (document.activeElement !== $('remoteUrl')) $('remoteUrl').value = settings.remoteRulesUrl || '';
   }
 
+  // —— 规则试算器（纯本地，与内容脚本同一套识别引擎）——
+
+  var tryState = { settings: null, extraRules: { text: [], name: [] } };
+
+  /** 与内容脚本 rebuildExtraRules 同序：远程在前、自定义在后，同形时自定义覆盖 */
+  function buildExtraRules(cr, remote) {
+    var text = [];
+    var name = [];
+    var rd = remote && remote.data;
+    if (rd) {
+      (rd.textRules || []).forEach(function (r) {
+        text.push({ pattern: r.pattern, weight: r.weight, label: '远程词库' });
+      });
+      (rd.nameRules || []).forEach(function (r) {
+        name.push({ pattern: r.pattern, weight: r.weight, label: '远程词库' });
+      });
+    }
+    (cr || []).forEach(function (r) {
+      text.push({ pattern: r.pattern, weight: r.weight, label: '自定义词' });
+    });
+    return { text: text, name: name };
+  }
+
+  function runTry() {
+    var text = $('tryText').value;
+    var name = $('tryName').value;
+    var box = $('tryResult');
+    if (!text.trim() && !name.trim()) {
+      box.classList.add('hidden');
+      return;
+    }
+    var s = tryState.settings || BZ.storage.DEFAULT_SETTINGS;
+    var thr = BZ.storage.THRESHOLD_BY_SENSITIVITY[s.sensitivity] || BZ.detector.DEFAULT_THRESHOLD;
+    var r = BZ.detector.analyze(
+      { text: text, displayName: name },
+      thr,
+      tryState.extraRules,
+      { repeatedText: $('tryRepeat').checked }
+    );
+
+    $('tryScore').textContent = r.score;
+    $('tryThreshold').textContent = r.threshold;
+    var verdict = $('tryVerdict');
+    verdict.textContent = r.flagged ? '疑似妖物 · 会标黄' : '未达阈值 · 不标黄';
+    verdict.className = r.flagged ? 'flagged' : 'clean';
+    box.classList.remove('hidden');
+    box.classList.toggle('flagged', r.flagged);
+
+    var list = $('tryHits');
+    list.innerHTML = '';
+    if (!r.hits.length) {
+      var li = document.createElement('li');
+      var empty = document.createElement('span');
+      empty.className = 'where';
+      empty.textContent = '无命中';
+      li.appendChild(empty);
+      list.appendChild(li);
+      return;
+    }
+    r.hits.forEach(function (h) {
+      var item = document.createElement('li');
+      var left = document.createElement('span');
+      left.textContent = h.label;
+      var where = document.createElement('span');
+      where.className = 'where';
+      where.textContent = WHERE_NAMES[h.where] || h.where;
+      left.appendChild(where);
+      var tag = document.createElement('span');
+      tag.className = 'wtag';
+      tag.textContent = (WEIGHT_NAMES[h.weight] || h.weight) + ' ×' + h.weight;
+      item.appendChild(left);
+      item.appendChild(tag);
+      list.appendChild(item);
+    });
+  }
+
   function renderState(settings, stats, queueState, wl, cr, marks, remote) {
     $('enabled').checked = settings.enabled;
     $('sensitivityHint').textContent = HINTS[settings.sensitivity] || '';
@@ -182,6 +259,11 @@
     renderWhitelist(wl);
     renderCustomRules(cr);
     renderRecentBlocks(marks);
+
+    // 试算器跟随最新词库与灵敏度（改动即时反映在已输入的文本上）
+    tryState.settings = settings;
+    tryState.extraRules = buildExtraRules(cr, remote);
+    runTry();
   }
 
   function load() {
@@ -215,6 +297,10 @@
   $('crInput').addEventListener('keydown', function (e) {
     if (e.key === 'Enter') addCustomRule();
   });
+
+  $('tryText').addEventListener('input', runTry);
+  $('tryName').addEventListener('input', runTry);
+  $('tryRepeat').addEventListener('change', runTry);
 
   function addCustomRule() {
     var input = $('crInput');

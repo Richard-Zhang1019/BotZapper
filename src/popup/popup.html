@@ -64,6 +64,27 @@
 
   <section class="card">
     <div class="row between">
+      <span class="label">规则试算器</span>
+      <label class="try-repeat" title="模拟同页多账号复读同一文本的 +2 组合信号">
+        <input type="checkbox" id="tryRepeat"> 模拟同页复读 +2
+      </label>
+    </div>
+    <div class="try-inputs">
+      <input type="text" id="tryName" maxlength="60" placeholder="昵称（可选），如：雨萱🍑找炮友">
+      <textarea id="tryText" rows="3" maxlength="2000" placeholder="粘贴评论文本，实时算分…"></textarea>
+    </div>
+    <div class="try-result hidden" id="tryResult">
+      <div class="row between">
+        <span class="small">妖气值 <b id="tryScore">0</b> / 阈值 <span id="tryThreshold">3</span></span>
+        <b id="tryVerdict"></b>
+      </div>
+      <ul class="wl" id="tryHits"></ul>
+    </div>
+    <p class="hint">本地实时评分：按当前灵敏度 + 自定义词/远程词库计算命中明细，调词库不必回 X 试。</p>
+  </section>
+
+  <section class="card">
+    <div class="row between">
       <span class="label">规则库</span>
       <span class="small" id="rulesStatus">内置 v--</span>
     </div>
@@ -102,6 +123,7 @@
 
   <script src="../core/normalize.js"></script>
   <script src="../core/rules.js"></script>
+  <script src="../core/detector.js"></script>
   <script src="../core/storage.js"></script>
   <script src="popup.js"></script>
 </body>
