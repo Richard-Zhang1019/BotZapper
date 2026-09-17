@@ -9,11 +9,13 @@
   .pagehead { padding: 12px 16px; font-weight: 800; font-size: 18px; border-bottom: 1px solid #2f3336; position: sticky; top: 0; background: rgba(0,0,0,.85); }
   article[data-testid="tweet"] { position: relative; padding: 12px 16px; border-bottom: 1px solid #2f3336; cursor: default; }
   article[data-testid="tweet"]:hover { background: #080808; }
-  .ava { position: absolute; left: 16px; top: 14px; width: 40px; height: 40px; border-radius: 50%; background: #2f3336; }
-  .u { display: flex; gap: 6px; align-items: center; font-size: 15px; margin: 0 0 4px 56px; }
+  .row { display: flex; gap: 12px; }
+  .ava { width: 40px; height: 40px; border-radius: 50%; background: #2f3336; flex: none; }
+  .main { flex: 1; min-width: 0; }
+  .u { display: flex; gap: 6px; align-items: center; font-size: 15px; margin: 0 0 4px; }
   .u a { color: #e7e9ea; font-weight: 700; text-decoration: none; }
   .u .handle, .u .time { color: #71767b; font-weight: 400; font-size: 15px; }
-  [data-testid="tweetText"] { font-size: 15px; line-height: 1.5; white-space: pre-wrap; margin-left: 56px; }
+  [data-testid="tweetText"] { font-size: 15px; line-height: 1.5; white-space: pre-wrap; }
   .side { position: fixed; right: 24px; top: 16px; color: #71767b; font-size: 12px; max-width: 220px; }
 </style>
 </head>
@@ -24,7 +26,7 @@
 </div>
 <div class="side">
   fixture 说明：本页用假 DOM 模拟 X 结构（含真实页面的头像链接在前细节），加载真实的识别引擎与 UI 代码。<br><br>
-  预期：1/2/3/5/8/9/10 黄色高亮；11/12/13 因「同页复读」(+2) 组合触发；4/6/7 正常显示。
+  预期：1/2/3/5/8/9/10/14/15/16 黄色高亮；11/12/13 因「同页复读」(+2) 组合触发；4/6/7 正常显示。
 </div>
 
 <script>
@@ -99,18 +101,26 @@ var SAMPLES = [
   { n: '10 · 违规昵称+纯emoji正文', h: 'clorindade5qjx', t: '🌱', nick: '雪瑶💃女大找炮友💃' },
   { n: '11 · 复读组A（正常昵称）', h: 'user_aaa11', t: '速上车，进裙看福利', nick: '路人甲' },
   { n: '12 · 复读组B（正常昵称）', h: 'user_bbb22', t: '速上车，进裙看福利', nick: '路人乙' },
-  { n: '13 · 复读组C（正常昵称）', h: 'user_ccc33', t: '速 上,车～进裙看福利', nick: '路人丙' }
+  { n: '13 · 复读组C（正常昵称）', h: 'user_ccc33', t: '速 上,车～进裙看福利', nick: '路人丙' },
+  { n: '14 · 我福不黑组A', h: 'lavonamaticpz', t: '应该没人比我玩的开了吧🤪🐼我福不黑不信你看', nick: '向珊🌸' },
+  { n: '15 · 我福不黑组B', h: 'damarisgernlnc', t: '应该没人比我玩的开了吧🎁👀我福不黑不信你看', nick: '听芹🌸' },
+  { n: '16 · 我福不黑组C（换行变体）', h: 'cxxx', t: '应该没人比我玩的开了吧🏰😈我福\n不黑不信你看', nick: '陆兰🌸同城上门' }
 ];
 
 var feed = document.getElementById('feed');
 SAMPLES.forEach(function (s) {
   var a = document.createElement('article');
   a.setAttribute('data-testid', 'tweet');
+  // 仿真 X 层级：article > 行容器 > [头像列, 内容主列 > User-Name + tweetText]
   a.innerHTML =
-    '<a class="ava" href="/' + s.h + '"></a>' +
-    '<div class="u" data-testid="User-Name"><a href="/' + s.h + '">' + (s.nick || s.n) + '</a>' +
-    '<span class="handle">@' + s.h + ' · 1小时</span></div>' +
-    '<div data-testid="tweetText"></div>';
+    '<div class="row">' +
+    '  <div class="ava"></div>' +
+    '  <div class="main">' +
+    '    <div class="u" data-testid="User-Name"><a href="/' + s.h + '">' + (s.nick || s.n) + '</a>' +
+    '    <span class="handle">@' + s.h + ' · 1小时</span></div>' +
+    '    <div data-testid="tweetText"></div>' +
+    '  </div>' +
+    '</div>';
   a.querySelector('[data-testid="tweetText"]').textContent = s.t;
   feed.appendChild(a);
 });
@@ -126,6 +136,7 @@ SAMPLES.forEach(function (s) {
 <script src="../src/content/main.js"></script>
 
 <!-- ?autoblock=1：自动点击第一个「拉黑」与「一键清理」，验证 blocked 状态流转（仅测试用） -->
+<!-- ?clobber=1：模拟 X 的 React 在 hover 重渲染时重写 className，验证属性选择器高亮不被抹掉 -->
 <script>
 if (location.search.indexOf('autoblock') !== -1) {
   setTimeout(function () {
@@ -136,6 +147,13 @@ if (location.search.indexOf('autoblock') !== -1) {
     var clear = document.querySelector('#tz-badge .tz-clear');
     if (clear && !clear.disabled) clear.click();
   }, 1600);
+}
+if (location.search.indexOf('clobber') !== -1) {
+  setTimeout(function () {
+    document.querySelectorAll('article[data-tz="flag"]').forEach(function (a) {
+      a.className = 'css-175oi2r r-clobbered-by-react'; // 模拟 React 抹掉 tz-flag
+    });
+  }, 2000);
 }
 </script>
 </body>
