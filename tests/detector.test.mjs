@@ -178,3 +178,15 @@ test('validateRemote：结构校验、权重钳制、拒绝空版本', () => {
   assert.ok(!rules.validateRemote({ textRules: [] }).ok); // 缺版本号
   assert.ok(!rules.validateRemote(null).ok);
 });
+
+// —— 真实样本「我福不黑」机器复读文案 ——
+
+test('我福不黑：单词不触发（防真人玩梗误杀），组合复读信号即触发', () => {
+  const solo = analyze({ text: '又见我福不黑，笑死', displayName: '路人' }, STD);
+  assert.ok(solo.hits.some(h => h.key === 'wofubuhei'));
+  assert.ok(!solo.flagged); // 2 分，真人引用/玩梗不打扰
+
+  const bot = analyze({ text: '应该没人比我玩的开了吧🤪🐼我福不黑不信你看', displayName: '向珊🌸' }, STD,
+    null, { repeatedText: true });
+  assert.ok(bot.flagged); // 我福不黑(2)+同页复读(2)=4，标准档即可识别
+});

@@ -30,6 +30,9 @@
     S('zhaopaoyou', '找炮友', '色情引流'), M('paoyou', '炮友', '色情引流'),
     S('pochu', '破处', '色情引流'),
     M('dianzhuye', '点主页', '主页导流'), M('zhijinrushenti', '只进入身体', '机器复读'),
+    // 推特中文圈最经典的机器复读文案（「我福不黑不信你看」），
+    // 单独仅 2 分（真人玩梗引用不误杀），与复读/昵称信号组合即触发
+    M('wofubuhei', '我福不黑', '机器复读'),
     // —— 导流话术（中信号）——
     M('kanwozhuye', '看我主页', '主页导流'), M('zhuyeyou', '主页有', '主页导流'),
     M('kanzhiding', '看置顶', '主页导流'), M('zhidingyou', '置顶有', '主页导流'),
@@ -109,7 +112,7 @@
   };
 
   var api = {
-    version: '2026.09.16.2',
+    version: '2026.09.16.3',
     textRules: textRules,
     regexRules: regexRules,
     nameRules: nameRules,
