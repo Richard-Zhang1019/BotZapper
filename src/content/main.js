@@ -261,7 +261,11 @@
       pendingSet.add(handle.toLowerCase());
       scan(); // fp 含 pending 标记，会触发该条重渲染为「排队中」
       send({ type: 'ENQUEUE_BLOCKS', users: [{ screenName: handle }], csrf: csrf }).then(function (res) {
-        if (!res.ok) { pendingSet.delete(handle.toLowerCase()); scan(); }
+        // 未入队（重复/队列已满）：撤销「排队中」状态，按钮恢复可点
+        if (!res.ok || !res.accepted || !res.accepted.length) {
+          pendingSet.delete(handle.toLowerCase());
+          scan();
+        }
       });
     },
     onBlockAll: function () {
@@ -279,7 +283,13 @@
       if (!users.length) return;
       scan();
       send({ type: 'ENQUEUE_BLOCKS', users: users, csrf: csrf }).then(function (res) {
-        if (!res.ok) { users.forEach(function (u) { pendingSet.delete(u.screenName.toLowerCase()); }); scan(); }
+        // 以 SW 返回的 accepted 名单为准：没入队的（重复/超队列上限）退出「排队中」
+        var acceptedSet = {};
+        ((res.ok && res.accepted) || []).forEach(function (sn) { acceptedSet[sn] = true; });
+        users.forEach(function (u) {
+          if (!acceptedSet[u.screenName.toLowerCase()]) pendingSet.delete(u.screenName.toLowerCase());
+        });
+        scan();
       });
     },
     onPardon: function (handle) {

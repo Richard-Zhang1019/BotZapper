@@ -12,6 +12,9 @@
   var RATE_LIMIT_COOLDOWN_MS = 10 * 60 * 1000; // 默认熔断冷却（与 storage 常量保持一致）
   // 持久化恢复：SW 中途被杀后遗落的 processing 任务，超过该时长视为已死，可重新执行
   var STALE_PROCESSING_MS = 5 * 60 * 1000;
+  // 队列总长上限（含撤销任务）：防一键清理把热帖整页数百账号全部入队，
+  // 挤占 storage 并让「清理中」状态持续数日（日限额 50 下 100 条已是两天存量）
+  var MAX_QUEUE_LEN = 100;
 
   function defaultDailyLimit(settings) {
     return settings && typeof settings.dailyLimit === 'number' ? settings.dailyLimit : 50;
@@ -102,12 +105,41 @@
     return { kind: 'requeue', attempts: attempts };
   }
 
+  /**
+   * 入队筛选：同账号同动作去重（大小写不敏感），队列总长达上限后不再接收。
+   * 拉黑与撤销是相反操作，同账号允许两个动作共存（后入队者后执行，符合操作顺序）。
+   * @param {Array} queue 现有队列（只读，不改写）
+   * @param {Array<string>} incoming 请求入队的 screenName 列表，按传入顺序
+   * @param {string} action 'block' | 'unblock'
+   * @param {number} [maxLen] 队列总长上限，默认 MAX_QUEUE_LEN
+   * @returns {Array<string>} 实际可入队的 screenName（小写，保持传入顺序）
+   */
+  function selectEnqueue(queue, incoming, action, maxLen) {
+    maxLen = maxLen || MAX_QUEUE_LEN;
+    var existing = {};
+    (queue || []).forEach(function (j) {
+      existing[String(j.screenName || '').toLowerCase() + ':' + j.action] = true;
+    });
+    var accepted = [];
+    (incoming || []).forEach(function (sn) {
+      var name = String(sn || '').trim().toLowerCase();
+      if (!name) return;
+      if (existing[name + ':' + action]) return;
+      if ((queue || []).length + accepted.length >= maxLen) return;
+      existing[name + ':' + action] = true;
+      accepted.push(name);
+    });
+    return accepted;
+  }
+
   var api = {
     MAX_ATTEMPTS: MAX_ATTEMPTS,
     RATE_LIMIT_COOLDOWN_MS: RATE_LIMIT_COOLDOWN_MS,
     STALE_PROCESSING_MS: STALE_PROCESSING_MS,
+    MAX_QUEUE_LEN: MAX_QUEUE_LEN,
     evaluateNext: evaluateNext,
-    planOutcome: planOutcome
+    planOutcome: planOutcome,
+    selectEnqueue: selectEnqueue
   };
 
   root.BotZapper = root.BotZapper || {};

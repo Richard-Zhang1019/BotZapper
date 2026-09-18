@@ -160,3 +160,33 @@ test('决策函数不改写输入（纯函数约定）', () => {
   QP.planOutcome(job2, { status: 'network_error' });
   assert.equal(job2.attempts, 0); // attempts 增量由 SW 落库时写入
 });
+
+// —— selectEnqueue：入队去重与队列上限 ——
+
+test('同账号同动作去重（大小写不敏感），批内重复也去重', () => {
+  const queue = [blockJob({ screenName: 'spam1' })];
+  assert.deepEqual(
+    QP.selectEnqueue(queue, ['SPAM1', 'spam1', ' spam2 '], 'block'),
+    ['spam2'] // 返回小写规范形
+  );
+});
+
+test('拉黑与撤销允许共存：同账号不同动作不去重', () => {
+  const queue = [blockJob({ screenName: 'spam1' })];
+  assert.deepEqual(QP.selectEnqueue(queue, ['spam1'], 'unblock'), ['spam1']);
+});
+
+test('队列总长达上限后按传入顺序截断，满了则全拒', () => {
+  // 队列已有 2 条（含撤销），上限 3 → 只能再收 1 条
+  const queue = [blockJob({ screenName: 'a' }), blockJob({ action: 'unblock', screenName: 'b' })];
+  assert.deepEqual(QP.selectEnqueue(queue, ['c', 'd', 'e'], 'block', 3), ['c']);
+  // 上限 2 = 现有长度 → 全拒（撤销任务同样占用上限）
+  assert.deepEqual(QP.selectEnqueue(queue, ['c'], 'block', 2), []);
+});
+
+test('空账号名跳过；不改写输入队列', () => {
+  const queue = [blockJob()];
+  const before = JSON.stringify(queue);
+  assert.deepEqual(QP.selectEnqueue(queue, ['', '   ', 'new1'], 'block'), ['new1']);
+  assert.equal(JSON.stringify(queue), before);
+});

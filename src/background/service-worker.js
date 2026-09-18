@@ -30,6 +30,8 @@ async function maybeUpdateRules(force) {
   var settings = await BZS.getSettings();
   var url = (settings.remoteRulesUrl || '').trim();
   if (!url) return { ok: false, reason: 'disabled' };
+  // 词库内容有 validateRemote 校验，传输也要锁死 https：http 明文有被中途篡改的窗口
+  if (!/^https:\/\//i.test(url)) return { ok: false, reason: 'insecure_url' };
 
   var current = await BZS.getRemoteRules();
   if (!force && current.fetchedAt && Date.now() - current.fetchedAt < RULES_TTL_MS) {
@@ -178,17 +180,10 @@ async function blockUser(job) {
 function enqueueUsers(msg, sender, action) {
   var BZS = self.BotZapper.storage;
   return BZS.getQueue().then(function (queue) {
-    var existing = {};
-    queue.forEach(function (j) {
-      // 同一账号同一动作去重；拉黑与撤销是相反操作，允许共存（后入队者后执行，符合操作顺序）
-      existing[j.screenName.toLowerCase() + ':' + j.action] = true;
-    });
-    var added = 0;
-    (msg.users || []).forEach(function (u) {
-      var sn = String(u.screenName || '').toLowerCase();
-      var key = sn + ':' + action;
-      if (!sn || existing[key]) return;
-      existing[key] = true;
+    var incoming = (msg.users || []).map(function (u) { return u.screenName; });
+    // 去重与队列总长上限（防一键清理把整页数百账号全部入队）在纯函数里决策
+    var accepted = self.BotZapper.queuePolicy.selectEnqueue(queue, incoming, action);
+    accepted.forEach(function (sn) {
       queue.push({
         id: Date.now() + '-' + Math.random().toString(36).slice(2),
         action: action,
@@ -197,9 +192,8 @@ function enqueueUsers(msg, sender, action) {
         tabId: sender && sender.tab ? sender.tab.id : null,
         attempts: 0, processing: false, ts: Date.now()
       });
-      added++;
     });
-    return BZS.setQueue(queue).then(function () { return added; });
+    return BZS.setQueue(queue).then(function () { return accepted; });
   });
 }
 
@@ -210,10 +204,11 @@ self.chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
 
     if (msg.type === 'ENQUEUE_BLOCKS' || msg.type === 'ENQUEUE_UNBLOCKS') {
       var action = msg.type === 'ENQUEUE_UNBLOCKS' ? 'unblock' : 'block';
-      var added = await enqueueUsers(msg, sender, action);
+      var accepted = await enqueueUsers(msg, sender, action);
       // 新任务入队可能发生在熔断结束后：清掉过期的 rate_limit 暂停标记，交给 processQueue 判断
       await processQueue();
-      return sendResponse({ ok: true, queued: added });
+      // accepted 名单返回给调用方：未入队的（重复/超上限）需要撤销「排队中」状态
+      return sendResponse({ ok: true, queued: accepted.length, accepted: accepted });
     }
 
     if (msg.type === 'UPDATE_RULES') {
