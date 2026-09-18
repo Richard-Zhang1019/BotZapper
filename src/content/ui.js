@@ -208,7 +208,7 @@
       if (model.queuePaused && model.pauseReason === 'rate_limit') notes.push('触发平台限流，队列已熔断暂停');
       if (model.queuePaused && model.pauseReason === 'auth_error') notes.push(model.pauseNote || '登录状态失效');
       if (model.dailyReached) notes.push('今日拉黑已达上限，明日自动恢复');
-      if (model.pendingAny) notes.push('拉黑请求串行发送中，请勿关闭页面');
+      if (model.pendingAny) notes.push('后台串行发送中，可关闭页面');
       noteEl.textContent = notes.join(' · ');
       el.style.display = model.visible === false ? 'none' : '';
     }
