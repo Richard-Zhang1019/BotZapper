@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "推妖镜 BotZapper",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "照妖镜一照，妖怪现形：识别 X/Twitter 评论区垃圾账号，高亮标注并一键原生拉黑。全程本地运行，不收集任何数据。",
   "permissions": ["storage", "alarms"],
   "host_permissions": ["https://x.com/*", "https://twitter.com/*"],

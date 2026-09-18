@@ -4,7 +4,7 @@
 
 识别 X (Twitter) 评论区垃圾账号——黄推引流、钓鱼、兼职刷单、金融诈骗——黄色高亮标注,并提供**一键原生拉黑**的 Chrome 浏览器扩展。
 
-![License](https://img.shields.io/badge/license-MIT-green) ![Chrome MV3](https://img.shields.io/badge/Chrome-Manifest%20V3-4285G4?logo=googlechrome&logoColor=white) ![零依赖](https://img.shields.io/badge/dependencies-0-success) ![测试](https://img.shields.io/badge/tests-50%2F50%20passing-brightgreen) ![隐私](https://img.shields.io/badge/privacy-no%20telemetry-blue)
+![License](https://img.shields.io/badge/license-MIT-green) ![Chrome MV3](https://img.shields.io/badge/Chrome-Manifest%20V3-4285G4?logo=googlechrome&logoColor=white) ![零依赖](https://img.shields.io/badge/dependencies-0-success) ![测试](https://img.shields.io/badge/tests-54%2F54%20passing-brightgreen) ![隐私](https://img.shields.io/badge/privacy-no%20telemetry-blue)
 
 ![推妖镜效果演示](docs/screenshot-timeline.png)
 
@@ -20,7 +20,7 @@
 
 ### 🔍 识别:评分制引擎,专门对抗伪装
 
-- **本地评分引擎**:词库命中加权求和,总分过阈值才标黄。内置约 90 条规则**全文公开可查**,识别阶段**零网络请求**。
+- **本地评分引擎**:词库命中加权求和,总分过阈值才标黄。内置 110 条规则(82 文本 + 4 正则 + 24 昵称)**全文公开可查**,识别阶段**零网络请求**。
 - **字符伪装全看穿**:全角字母(`ｖｘ`)、零宽字符、emoji 插空(`看.我.主.页`、`不进入生活🙅只进入身体`)、**繁体变体**(`約炮`→`约炮`,归一化层自动折叠)、**拼音谐音**(`vx`、`+v`、`薇信`、`薇芯`、`威芯`),一样现形。
 - **同页复读检测**:多个账号在同页复读同一文本(≥3 次、≥8 字符)判定为机器刷评,作为组合信号参与评分。
 - **三层词库合并**:自定义词 > 远程热更新词 > 内置词,同形覆盖不重复计分。
@@ -82,12 +82,34 @@
 
 无 tabs、无历史、无跨站追踪,识别阶段零网络请求。
 
+## 更新日志
+
+### v0.3.0
+- **规则试算器**:弹窗粘贴评论文本实时算分,显示每条命中(词、权重、正文还是昵称),可模拟同页复读信号——调词库不必回 X 页面反复试;
+- **繁简折叠**:約炮/上門服務/電報群等繁体黑产变体自动折叠为简体匹配,无需维护第二套词库;
+- **拼音谐音词库**:vx / v信 / +v / 薇信 / 薇芯 / 威芯 / 微芯 一族(中信号,需组合防误伤);
+- **队列决策纯函数化**(queue-policy.js):熔断/限额/恢复逻辑可单测;入队去重上限与远程词库强制 https 校验;
+- 设置面板视觉翻新。
+
+### v0.2.1
+- 内置词库收录「我福不黑」机器复读文案(标准灵敏度即可识别,修复需切严格档才触发的问题);
+- 高亮改 data-tz 属性驱动,修复 hover 时边框消失(X 重渲染会重写 className);
+- 工具栏改挂内容主列,修复时间线上被挤成右侧窄条的问题,间距对齐 X 节奏;
+- 拉黑/误判/一键清理按钮动效(hover 光晕、按压回弹、键盘焦点环)。
+
+### v0.2.0
+- 同页复读检测、撤销拉黑、规则热更新(远程词库)、自定义违规词(默认「强」)、每日限额可调;
+- 上下文失效静默降级:扩展重载后旧页签不再报错。
+
+### v0.1.0
+- MVP:本地识别、黄框标注、串行限速原生拉黑、三层白名单、误判豁免。
+
 ## 开发
 
 零依赖、无构建步骤,纯 Manifest V3 原生 JS。
 
 ```
-node --test "tests/*.test.mjs"   # 单元测试(50 例:识别引擎 + 队列决策)
+node --test "tests/*.test.mjs"   # 单元测试(54 例:识别引擎、归一化与队列决策)
 python3 scripts/gen-icons.py     # 重新生成图标(需 Pillow)
 ```
 
