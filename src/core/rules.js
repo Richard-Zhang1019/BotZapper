@@ -33,6 +33,8 @@
     // 推特中文圈最经典的机器复读文案（「我福不黑不信你看」），
     // 单独仅 2 分（真人玩梗引用不误杀），与复读/昵称信号组合即触发
     M('wofubuhei', '我福不黑', '机器复读'),
+    // 「太阳射不进去的地方你可以」同族复读文案（2026-09-17 真实样本）
+    M('taiyangshe', '太阳射不进去', '机器复读'),
     // —— 导流话术（中信号）——
     M('kanwozhuye', '看我主页', '主页导流'), M('zhuyeyou', '主页有', '主页导流'),
     M('kanzhiding', '看置顶', '主页导流'), M('zhidingyou', '置顶有', '主页导流'),
@@ -108,7 +110,11 @@
     { key: 'n_pochu', weight: 4, label: '色情引流', pattern: '破处' },
     { key: 'n_dianzhuye', weight: 2, label: '主页导流', pattern: '点主页' },
     { key: 'n_nvda', weight: 1, label: '昵称可疑', pattern: '女大' },
-    { key: 'n_tongcheng', weight: 1, label: '疑似引流', pattern: '同城' }
+    { key: 'n_tongcheng', weight: 1, label: '疑似引流', pattern: '同城' },
+    // —— 2026-09-17 真实样本补充：处男/无偿 一族免费色情引流昵称 ——
+    // 只做昵称规则不做正文规则：「我还是处男」式自嘲是真话，昵称场景几乎全是诱饵
+    { key: 'n_chunan', weight: 2, label: '色情引流', pattern: '处男' },
+    { key: 'n_wuchang', weight: 1, label: '昵称可疑', pattern: '无偿' }
   ];
 
   var metaRules = {
@@ -120,7 +126,7 @@
   };
 
   var api = {
-    version: '2026.09.17.1',
+    version: '2026.09.17.2',
     textRules: textRules,
     regexRules: regexRules,
     nameRules: nameRules,

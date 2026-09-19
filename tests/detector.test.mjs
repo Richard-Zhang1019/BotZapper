@@ -191,6 +191,29 @@ test('我福不黑：单词不触发（防真人玩梗误杀），组合复读�
   assert.ok(bot.flagged); // 我福不黑(2)+同页复读(2)=4，标准档即可识别
 });
 
+// —— 真实样本「太阳射不进去」同族复读文案 + 处男/无偿 引流昵称 ——
+
+test('处男无偿昵称组合触发（标准档）；「我还是处男」自嘲不误杀', () => {
+  const bot = analyze({ text: '太阳射💕不进去🍁的地方🌹你可以🌼', displayName: '清妍♥处男无偿♥' }, STD,
+    null, { repeatedText: true });
+  assert.ok(bot.flagged); // 处男(2)+无偿(1)+复读(2)=5
+  assert.ok(bot.hits.some(h => h.key === 'n_chunan' && h.where === 'name'));
+
+  // 正文规则不收「处男」：真诚自嘲是真话，昵称场景才是诱饵
+  const solo = analyze({ text: '我25年了还是处男😂', displayName: '路人' }, STD);
+  assert.ok(!solo.flagged);
+  assert.ok(!solo.hits.some(h => h.key === 'n_chunan'));
+});
+
+test('太阳射不进去：复读文案单词仅严格档触发，组合信号标准档触发', () => {
+  const solo = analyze({ text: '太阳射😷不进去😭的地方🍌你可以🍌', displayName: '可可💃女大找炮友💃' }, STD);
+  assert.ok(solo.hits.some(h => h.key === 'taiyangshe'));
+  assert.ok(analyze({ text: '太阳射不进去的地方', displayName: 'x' }, 2).flagged); // 严格档 2 分即触发
+
+  const withRep = analyze({ text: '太阳射不进去的地方', displayName: '路人' }, STD, null, { repeatedText: true });
+  assert.ok(withRep.flagged); // 复读文案(2)+同页复读(2)=4
+});
+
 // —— 拼音/变体归一化（vx / +v / 薇信 / 繁体）——
 
 test('繁体变体话术折叠后命中内置简体词库', () => {
