@@ -214,6 +214,27 @@ test('太阳射不进去：复读文案单词仅严格档触发，组合信号�
   assert.ok(withRep.flagged); // 复读文案(2)+同页复读(2)=4
 });
 
+// —— 真实样本「快手直播紫薇」同族引流模板 ——
+
+test('快手直播紫薇模板：换片名/细节后仍标准档触发', () => {
+  const texts = [
+    '这是快手上的《烧杯七七》刚还直播紫薇了 水都流了一地 太骚了',
+    '这是快手上的《宝藏小花》刚才还直播紫薇了 太牛了 水都流了一地',
+    '这还真是快手上的《柔心猫猫》刚才还直播紫薇了 太牛了 水都流了一地'
+  ];
+  for (const text of texts) {
+    const r = analyze({ text, displayName: 'Shyanne Haering' }, STD);
+    assert.ok(r.flagged, text);
+    assert.ok(r.hits.some(h => h.key === 'kuaishoustream'));
+  }
+});
+
+test('快手与紫薇分开出现时不误杀', () => {
+  const r = analyze({ text: '这是快手上的正经直播间，今晚聊紫薇星座', displayName: '路人' }, STD);
+  assert.ok(!r.flagged);
+  assert.ok(!r.hits.some(h => h.key === 'kuaishoustream'));
+});
+
 // —— 拼音/变体归一化（vx / +v / 薇信 / 繁体）——
 
 test('繁体变体话术折叠后命中内置简体词库', () => {

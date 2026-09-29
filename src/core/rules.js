@@ -35,6 +35,10 @@
     M('wofubuhei', '我福不黑', '机器复读'),
     // 「太阳射不进去的地方你可以」同族复读文案（2026-09-17 真实样本）
     M('taiyangshe', '太阳射不进去', '机器复读'),
+    // 「这是快手上的《XXX》……直播紫薇了……水都流了一地」同族模板（2026-09-29 真实样本）。
+    // 收成两个中信号，避免把普通的快手讨论或“紫薇”人名单独误杀。
+    M('zhiboziwei', '直播紫薇了', '色情引流'),
+    M('shuidouliu', '水都流了一地', '色情引流'),
     // —— 导流话术（中信号）——
     M('kanwozhuye', '看我主页', '主页导流'), M('zhuyeyou', '主页有', '主页导流'),
     M('kanzhiding', '看置顶', '主页导流'), M('zhidingyou', '置顶有', '主页导流'),
@@ -81,7 +85,10 @@
     // 尾部负向断言排除 vip/vo 之类的普通词
     { key: 'plusv', weight: 2, label: '站外导流', re: /(?:\+|加)\s*v(?:x)?(?![a-z0-9])/i },
     { key: 'shortlink', weight: 1, label: '短链可疑', re: /(?:bit\.ly|cutt\.ly|tinyurl|is\.gd|shorte\.st|adf\.ly|clck\.ru|rb\.gy|ow\.ly|buff\.ly|shorturl\.at)\//i },
-    { key: 'ofsite', weight: 2, label: '色情引流', re: /(?:onlyfans\.com|fansly\.com)/i }
+    { key: 'ofsite', weight: 2, label: '色情引流', re: /(?:onlyfans\.com|fansly\.com)/i },
+    // 同族模板会更换《作品名》和“刚才/刚还”等细节，用模板骨架整体命中；
+    // “快手上的”必须与违规片段同现，避免普通平台讨论误报。
+    { key: 'kuaishoustream', weight: 4, label: '色情引流', re: /这(?:还真是|是)快手上的.{0,48}(?:直播紫薇了|水都流了一地)/ }
   ];
 
   // 昵称规则：匹配昵称 compact 形态
@@ -126,7 +133,7 @@
   };
 
   var api = {
-    version: '2026.09.17.2',
+    version: '2026.09.29.0',
     textRules: textRules,
     regexRules: regexRules,
     nameRules: nameRules,
