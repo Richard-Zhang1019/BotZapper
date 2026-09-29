@@ -4,7 +4,7 @@
 
 识别 X (Twitter) 评论区垃圾账号——黄推引流、钓鱼、兼职刷单、金融诈骗——黄色高亮标注,并提供**一键原生拉黑**的 Chrome 浏览器扩展。
 
-![License](https://img.shields.io/badge/license-MIT-green) ![Chrome MV3](https://img.shields.io/badge/Chrome-Manifest%20V3-4285G4?logo=googlechrome&logoColor=white) ![零依赖](https://img.shields.io/badge/dependencies-0-success) ![测试](https://img.shields.io/badge/tests-54%2F54%20passing-brightgreen) ![隐私](https://img.shields.io/badge/privacy-no%20telemetry-blue)
+![License](https://img.shields.io/badge/license-MIT-green) ![Chrome MV3](https://img.shields.io/badge/Chrome-Manifest%20V3-4285G4?logo=googlechrome&logoColor=white) ![零依赖](https://img.shields.io/badge/dependencies-0-success) ![测试](https://img.shields.io/badge/tests-58%2F58%20passing-brightgreen) ![隐私](https://img.shields.io/badge/privacy-no%20telemetry-blue)
 
 ![推妖镜效果演示](docs/screenshot-timeline.png)
 
@@ -20,7 +20,7 @@
 
 ### 🔍 识别:评分制引擎,专门对抗伪装
 
-- **本地评分引擎**:词库命中加权求和,总分过阈值才标黄。内置 110 条规则(82 文本 + 4 正则 + 24 昵称)**全文公开可查**,识别阶段**零网络请求**。
+- **本地评分引擎**:词库命中加权求和,总分过阈值才标黄。内置 116 条规则(85 文本 + 5 正则 + 26 昵称)**全文公开可查**,识别阶段**零网络请求**。
 - **字符伪装全看穿**:全角字母(`ｖｘ`)、零宽字符、emoji 插空(`看.我.主.页`、`不进入生活🙅只进入身体`)、**繁体变体**(`約炮`→`约炮`,归一化层自动折叠)、**拼音谐音**(`vx`、`+v`、`薇信`、`薇芯`、`威芯`),一样现形。
 - **同页复读检测**:多个账号在同页复读同一文本(≥3 次、≥8 字符)判定为机器刷评,作为组合信号参与评分。
 - **三层词库合并**:自定义词 > 远程热更新词 > 内置词,同形覆盖不重复计分。
@@ -84,6 +84,11 @@
 
 ## 更新日志
 
+### v0.3.1
+- 收录「这是快手上的《XXX》……直播紫薇了……水都流了一地」同族引流模板;模板骨架按强信号整体命中,换片名/细节后仍可在标准灵敏度识别;
+- 同时提供两个中信号短语作为兜底,单独提及快手或“紫薇”人名不会误伤;
+- 远程词库示例同步该模板的两个兜底短语。
+
 ### v0.3.0
 - **规则试算器**:弹窗粘贴评论文本实时算分,显示每条命中(词、权重、正文还是昵称),可模拟同页复读信号——调词库不必回 X 页面反复试;
 - **繁简折叠**:約炮/上門服務/電報群等繁体黑产变体自动折叠为简体匹配,无需维护第二套词库;
@@ -109,7 +114,7 @@
 零依赖、无构建步骤,纯 Manifest V3 原生 JS。
 
 ```
-node --test "tests/*.test.mjs"   # 单元测试(54 例:识别引擎、归一化与队列决策)
+node --test "tests/*.test.mjs"   # 单元测试(58 例:识别引擎、归一化与队列决策)
 python3 scripts/gen-icons.py     # 重新生成图标(需 Pillow)
 ```
 
