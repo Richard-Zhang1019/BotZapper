@@ -214,6 +214,31 @@ test('太阳射不进去：复读文案单词仅严格档触发，组合信号�
   assert.ok(withRep.flagged); // 复读文案(2)+同页复读(2)=4
 });
 
+// —— 2026-09-29 真实样本「约见/对接」一族 ——
+
+test('约见族：昵称钩子+复读文案组合，标准档触发', () => {
+  const a = analyze({ text: '玩得开🤗🍓更看得开', displayName: '全国1-5线🌈真实约见入口🌈点我主页' }, STD);
+  assert.ok(a.flagged); // 点我主页(昵称2)+玩得开更看得开(2)=4
+
+  const b = analyze({ text: '玩得开👋🍒更看得开', displayName: '线下对接🌈附近真实资源🌈点我头像' }, STD);
+  assert.ok(b.flagged); // 点我头像(2)+玩得开更看得开(2)=4
+
+  const c = analyze({ text: '那一夜你没有拒绝我😒😒不是人机', displayName: '真实约见🌈同城资源自取🌈看我简介' }, STD);
+  assert.ok(c.flagged); // 看我简介(2)+真实约见(2)+那一夜(1)+不是人机(1)=6
+});
+
+test('只入身体/不入生活：模板变体（删「进」字）组合触发', () => {
+  const r = analyze({ text: '只入身体🍀🐮不入生活', displayName: '甜桃子' }, STD);
+  assert.ok(r.flagged); // 只入身体(2)+不入生活(2)=4
+  assert.ok(r.hits.some(h => h.key === 'zhirushenti'));
+  assert.ok(r.hits.some(h => h.key === 'brushenghuo'));
+});
+
+test('《那一夜》歌词单独引用不误杀', () => {
+  const r = analyze({ text: '那一夜你没有拒绝我，然后呢', displayName: '路人' }, STD);
+  assert.ok(!r.flagged); // 弱信号 1 分
+});
+
 // —— 真实样本「快手直播紫薇」同族引流模板 ——
 
 test('快手直播紫薇模板：换片名/细节后仍标准档触发', () => {

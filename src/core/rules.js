@@ -39,6 +39,15 @@
     // 收成两个中信号，避免把普通的快手讨论或“紫薇”人名单独误杀。
     M('zhiboziwei', '直播紫薇了', '色情引流'),
     M('shuidouliu', '水都流了一地', '色情引流'),
+    // —— 2026-09-29 真实样本：约见/对接一族（昵称钩子见 nameRules）——
+    M('dianwozhuye', '点我主页', '主页导流'),
+    M('diwotouxiang', '点我头像', '主页导流'),
+    M('kanwojianjie', '看我简介', '主页导流'),
+    M('zhirushenti', '只入身体', '机器复读'),
+    M('brushenghuo', '不入生活', '机器复读'),
+    M('wdekkan', '玩得开更看得开', '机器复读'),
+    W('yiyenijujue', '那一夜你没有拒绝我', '机器复读'), // 《那一夜》歌词，单独出现不触发
+    W('bushirenji', '不是人机', '机器复读'),
     // —— 导流话术（中信号）——
     M('kanwozhuye', '看我主页', '主页导流'), M('zhuyeyou', '主页有', '主页导流'),
     M('kanzhiding', '看置顶', '主页导流'), M('zhidingyou', '置顶有', '主页导流'),
@@ -121,7 +130,13 @@
     // —— 2026-09-17 真实样本补充：处男/无偿 一族免费色情引流昵称 ——
     // 只做昵称规则不做正文规则：「我还是处男」式自嘲是真话，昵称场景几乎全是诱饵
     { key: 'n_chunan', weight: 2, label: '色情引流', pattern: '处男' },
-    { key: 'n_wuchang', weight: 1, label: '昵称可疑', pattern: '无偿' }
+    { key: 'n_wuchang', weight: 1, label: '昵称可疑', pattern: '无偿' },
+    // —— 2026-09-29 真实样本补充：约见/对接一族的昵称钩子 ——
+    { key: 'n_dianwozhuye', weight: 2, label: '主页导流', pattern: '点我主页' },
+    { key: 'n_dianwotouxiang', weight: 2, label: '主页导流', pattern: '点我头像' },
+    { key: 'n_kanwojianjie', weight: 2, label: '主页导流', pattern: '看我简介' },
+    { key: 'n_zhenxiangyuejian', weight: 2, label: '疑似引流', pattern: '真实约见' },
+    { key: 'n_xianduijie', weight: 2, label: '疑似引流', pattern: '线下对接' }
   ];
 
   var metaRules = {
@@ -133,7 +148,7 @@
   };
 
   var api = {
-    version: '2026.09.29.0',
+    version: '2026.09.29.1',
     textRules: textRules,
     regexRules: regexRules,
     nameRules: nameRules,
